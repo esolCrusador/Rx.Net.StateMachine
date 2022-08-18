@@ -27,7 +27,15 @@ namespace Rx.Net.StateMachine.ObservableExtensions
         public static StopAndWaitFactory<TSource> StopAndWait<TSource>(this IObservable<TSource> source) =>
             new StopAndWaitFactory<TSource>(source);
 
-        public static IObservable<TEvent> StopAndWait<TEvent>(StateMachineScope scope, Func<TEvent, bool> matches = null)
+        public static IObservable<TEvent> StopAndWait<TEvent>(StateMachineScope scope, string stateId, Func<TEvent, bool> matches = null)
+        {
+            return StopAndWait<TEvent>(scope, matches).Persist(scope, stateId);
+        }
+
+        /// <summary>
+        /// Starts await for event or triggers it if it is in events queue.
+        /// </summary>
+        private static IObservable<TEvent> StopAndWait<TEvent>(StateMachineScope scope, Func<TEvent, bool> matches = null)
         {
             var notHandledEvents = scope.GetEvents(matches).ToList();
 

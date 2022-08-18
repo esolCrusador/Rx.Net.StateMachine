@@ -13,11 +13,13 @@ namespace Rx.Net.StateMachine.ObservableExtensions
             _source = source;
         }
 
+        /// <summary>
+        /// Waits for event and than persists it
+        /// </summary>
         public IObservable<TEvent> For<TEvent>(StateMachineScope scope, string eventStateId, Func<TEvent, bool> filter = null)
         {
-            return _source.Select(_ => StateMachineObservableExtensions.StopAndWait(scope, filter))
-                .Concat()
-                .Persist(scope, eventStateId);
+            return _source.Select(_ => StateMachineObservableExtensions.StopAndWait(scope, eventStateId, filter))
+                .Concat();
         }
     }
 }
