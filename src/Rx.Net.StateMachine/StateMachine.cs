@@ -20,9 +20,9 @@ namespace Rx.Net.StateMachine
             sessionState.AddEvent(@event);
         }
 
-        public async Task<bool> HandleWorkflow<TResult>(SessionState sessionState, ISessionStateStorage repository, Func<StateMachineScope, IObservable<TResult>> workflowFactory)
+        public async Task<bool> HandleWorkflow<TResult>(SessionState sessionState, object context, ISessionStateStorage repository, Func<StateMachineScope, IObservable<TResult>> workflowFactory)
         {
-            var workflow = workflowFactory(new StateMachineScope(this, sessionState, repository));
+            var workflow = workflowFactory(new StateMachineScope(this, context, sessionState, repository));
             bool isFinished = default;
 
             try

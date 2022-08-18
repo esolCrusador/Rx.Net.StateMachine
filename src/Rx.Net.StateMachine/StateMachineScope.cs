@@ -11,14 +11,16 @@ namespace Rx.Net.StateMachine
 {
     public struct StateMachineScope
     {
+        private readonly object _context;
         public string StatePrefix { get; }
         public StateMachine StateMachine { get; }
         public SessionState SessionState { get; }
         public ISessionStateStorage SessionStateStorage { get; }
 
-        public StateMachineScope(StateMachine stateMachine, SessionState sessionState, ISessionStateStorage sessionStateRepository, string prefix = null)
+        public StateMachineScope(StateMachine stateMachine, object context, SessionState sessionState, ISessionStateStorage sessionStateRepository, string prefix = null)
         {
             StateMachine = stateMachine;
+            _context = context;
             SessionState = sessionState;
             SessionStateStorage = sessionStateRepository;
             StatePrefix = prefix;
@@ -28,7 +30,7 @@ namespace Rx.Net.StateMachine
             SessionState.TryGetStep(AddPrefix(stateId), StateMachine.SerializerOptions, out stepValue);
 
         public StateMachineScope BeginScope(string prefix) =>
-            new StateMachineScope(StateMachine, SessionState, SessionStateStorage, AddPrefix(prefix));
+            new StateMachineScope(StateMachine, _context, SessionState, SessionStateStorage, AddPrefix(prefix));
 
         public IEnumerable<TEvent> GetEvents<TEvent>(Func<TEvent, bool> matches) =>
             SessionState.GetEvents(matches, StateMachine.SerializerOptions);
@@ -60,6 +62,8 @@ namespace Rx.Net.StateMachine
 
             return SessionStateStorage.PersistEventAwaiter(SessionState);
         }
+
+        public TContext GetContext<TContext>() => (TContext)_context;
 
         private string AddPrefix(string stateId) =>
             StatePrefix == null ? stateId : $"{StatePrefix}.{stateId}";

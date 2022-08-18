@@ -27,13 +27,13 @@ namespace Rx.Net.StateMachine.Tests
             _stateMachine = new StateMachine { SerializerOptions = new JsonSerializerOptions() };
         }
 
-        public async Task<bool> HandleEvent<TEvent>(TEvent @event, Guid userId)
+        public async Task<bool> HandleEvent<TEvent>(TEvent @event, UserContext userContext)
         {
             using var uof = _uofFactory();
             var eventType = SessionEventAwaiter.GetTypeName(@event.GetType());
 
             var sessionStates = uof.GetSessionStates(ss =>
-                ss.UserId == userId
+                ss.UserId == userContext.UserId
                 && ss.Status == SessionStateStatus.InProgress
                 && ss.Awaiters.Any(aw => aw.TypeName == eventType)
             ).ToList();
@@ -42,7 +42,7 @@ namespace Rx.Net.StateMachine.Tests
             {
                 var newSessionState = new SessionStateEntity
                 {
-                    UserId = userId,
+                    UserId = userContext.UserId,
                     Status = SessionStateStatus.Created,
                     Steps = new List<SessionStepEntity>(),
                     Awaiters = new List<SessionEventAwaiterEntity>(),
@@ -57,12 +57,12 @@ namespace Rx.Net.StateMachine.Tests
 
             bool isFinished = false;
             foreach (var ss in sessionStates)
-                isFinished = (await HandleSessionState(ss, @event, uof)) || isFinished;
+                isFinished = (await HandleSessionState(ss, userContext, @event, uof)) || isFinished;
 
             return isFinished;
         }
 
-        private async Task<bool> HandleSessionState<TEvent>(SessionStateEntity sessionStateEntity, TEvent @event, SessionStateUnitOfWork uof)
+        private async Task<bool> HandleSessionState<TEvent>(SessionStateEntity sessionStateEntity, object context, TEvent @event, SessionStateUnitOfWork uof)
         {
             var sessionState = ToSessionState(sessionStateEntity);
             _stateMachine.AddEvent(sessionState, @event);
@@ -73,7 +73,7 @@ namespace Rx.Net.StateMachine.Tests
             });
 
             var workflowFactory = _workflowResolver.Invoke(sessionStateEntity);
-            return await _stateMachine.HandleWorkflow(sessionState, storage, workflowFactory);
+            return await _stateMachine.HandleWorkflow(sessionState, context, storage, workflowFactory);
         }
 
         private static SessionState ToSessionState(SessionStateEntity entity)

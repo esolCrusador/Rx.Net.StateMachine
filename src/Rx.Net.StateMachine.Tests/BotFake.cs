@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Subjects;
@@ -9,14 +10,13 @@ namespace Rx.Net.StateMachine.Tests
 {
     public class BotFake : IDisposable
     {
-        private int _messageId = 0;
-        private readonly List<string> _userMessages = new List<string>();
-        private readonly List<string> _botMessages = new List<string>();
+        private readonly ConcurrentDictionary<Guid, List<BotFrameworkMessage>> _userMessages = new ConcurrentDictionary<Guid, List<BotFrameworkMessage>>();
+        private readonly ConcurrentDictionary<Guid, List<BotFrameworkMessage>> _botMessages = new ConcurrentDictionary<Guid, List<BotFrameworkMessage>>();
 
-        private int _lastReadMessage = 0;
-        private Subject<string> _userMessagesSubject = new Subject<string>();
+        private ConcurrentDictionary<Guid, int> _lastReadMessage = new ConcurrentDictionary<Guid, int>();
+        private Subject<BotFrameworkMessage> _userMessagesSubject = new Subject<BotFrameworkMessage>();
 
-        public IObservable<string> UserMessages => _userMessagesSubject;
+        public IObservable<BotFrameworkMessage> UserMessages => _userMessagesSubject;
 
         public void Dispose()
         {
@@ -24,27 +24,32 @@ namespace Rx.Net.StateMachine.Tests
             _userMessagesSubject.Dispose();
         }
 
-        public IEnumerable<string> ReadNewBotMessages()
+        public IEnumerable<string> ReadNewBotMessages(Guid userId)
         {
-            var result = _botMessages.Skip(_lastReadMessage);
-            _lastReadMessage = _botMessages.Count;
+            var lastReadMessage = _lastReadMessage.GetOrAdd(userId, 0);
+            var messages = _botMessages.GetOrAdd(userId, _ => new List<BotFrameworkMessage>());
+            var result = messages.Skip(lastReadMessage);
+            _lastReadMessage.TryUpdate(userId, messages.Count, lastReadMessage);
 
-            return result;
+            return result.Select(m => m.Text);
         }
 
-        public Task<int> SendBotMessage(string message)
+        public Task<int> SendBotMessage(Guid userId, string message)
         {
-            _botMessages.Add(message);
+            var messages = _botMessages.GetOrAdd(userId, _ => new List<BotFrameworkMessage>());
+            int messageId = messages.LastOrDefault()?.MessageId ?? 0 + 1;
+            messages.Add(new BotFrameworkMessage(messageId, userId, message));
 
-            return Task.FromResult(++_messageId);
+            return Task.FromResult(messageId);
         }
 
-        public Task<int> SendUserMessage(string message)
+        public Task<int> SendUserMessage(Guid userId, string message)
         {
-            _userMessages.Add(message);
-            _userMessagesSubject.OnNext(message);
+            var messages = _userMessages.GetOrAdd(userId, _ => new List<BotFrameworkMessage>());
+            int messageId = messages.LastOrDefault()?.MessageId ?? 0 + 1;
+            _userMessagesSubject.OnNext(new BotFrameworkMessage(messageId, userId, message));
 
-            return Task.FromResult(++_messageId);
+            return Task.FromResult(messageId);
         }
     }
 }
