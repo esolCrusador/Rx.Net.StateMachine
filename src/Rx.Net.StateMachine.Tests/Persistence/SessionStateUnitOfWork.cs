@@ -7,13 +7,13 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using static Rx.Net.StateMachine.Tests.WorkflowManager;
 
-namespace Rx.Net.StateMachine.Tests
+namespace Rx.Net.StateMachine.Tests.Persistence
 {
     public class SessionStateDataStore
     {
         public readonly List<SessionStateEntity> SessionStates = new List<SessionStateEntity>();
     }
-    public class SessionStateUnitOfWork: IDisposable
+    public class SessionStateUnitOfWork : IDisposable
     {
         private readonly SessionStateDataStore _dataStore;
 
@@ -48,9 +48,9 @@ namespace Rx.Net.StateMachine.Tests
                 _added.Clear();
             }
 
-            if(_modified.Count > 0)
+            if (_modified.Count > 0)
             {
-                foreach(var updated in _modified)
+                foreach (var updated in _modified)
                 {
                     _dataStore.SessionStates[_dataStore.SessionStates.IndexOf(updated)] = DeepClone(updated);
                 }

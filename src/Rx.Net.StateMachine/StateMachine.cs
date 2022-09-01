@@ -1,4 +1,5 @@
-﻿using Rx.Net.StateMachine.States;
+﻿using Rx.Net.StateMachine.Helpers;
+using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Storage;
 using System;
 using System.Collections.Generic;
@@ -15,14 +16,31 @@ namespace Rx.Net.StateMachine
     {
         public JsonSerializerOptions SerializerOptions { get; set; }
 
-        public void AddEvent<TEvent>(SessionState sessionState, TEvent @event)
+        public bool AddEvent<TEvent>(SessionState sessionState, TEvent @event)
         {
-            sessionState.AddEvent(@event);
+            return sessionState.AddEvent(@event);
         }
 
-        public async Task<bool> HandleWorkflow<TResult>(SessionState sessionState, object context, ISessionStateStorage repository, Func<StateMachineScope, IObservable<TResult>> workflowFactory)
+        public void ForceAddEvent<TEvent>(SessionState sessionState, TEvent @event)
         {
-            var workflow = workflowFactory(new StateMachineScope(this, context, sessionState, repository));
+            sessionState.ForceAddEvent(@event);
+        }
+
+        public Task<HandlingResult> StartHandleWorkflow<TResult>(object context, Func<StateMachineScope, IObservable<TResult>> workflowFactory)
+        {
+            var sessionState = new SessionState(context);
+
+            return HandleWorkflow<TResult>(sessionState, workflowFactory);
+        }
+
+        public Task<HandlingResult> HandleWorkflow<TResult>(SessionState sessionState, Func<StateMachineScope, IObservable<TResult>> workflowFactory)
+        {
+            return HandleWorkflow<TResult>(sessionState, SessionStateStorage.Empty, workflowFactory);
+        }
+
+        public async Task<HandlingResult> HandleWorkflow<TResult>(SessionState sessionState, ISessionStateStorage repository, Func<StateMachineScope, IObservable<TResult>> workflowFactory)
+        {
+            var workflow = workflowFactory(new StateMachineScope(this, sessionState, repository));
             bool isFinished = default;
 
             try
@@ -46,7 +64,19 @@ namespace Rx.Net.StateMachine
 
             await repository.PersistSessionState(sessionState);
 
-            return isFinished;
+            return sessionState.Status == SessionStateStatus.Failed 
+                ? HandlingResult.Failed 
+                    : isFinished 
+                        ? HandlingResult.Finished 
+                        : HandlingResult.Handled;
+        }
+
+        public SessionState ParseSessionState(object context, string stateString)
+        {
+            using var stateStream = CompressionHelper.Unzip(stateString);
+            var minimalSessionState = JsonSerializer.Deserialize<MinimalSessionState>(stateStream, SerializerOptions);
+
+            return new SessionState(context, minimalSessionState.Counter, minimalSessionState.Steps, new List<PastSessionEvent>(), new List<SessionEventAwaiter>());
         }
 
         private class WorkflowFinishResult<TResult>

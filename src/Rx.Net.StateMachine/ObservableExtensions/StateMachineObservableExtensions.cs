@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reactive.Linq;
+using System.Reactive.Threading.Tasks;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -22,6 +23,20 @@ namespace Rx.Net.StateMachine.ObservableExtensions
 
                 return s;
             }).Concat();
+        }
+
+        public static IObservable<TSource> PersistBeforePrevious<TSource>(this IObservable<TSource> source, StateMachineScope scope, string stateId, TSource defaultValue = default)
+        {
+            if (scope.TryGetStep<TSource>(stateId, out var stepValue))
+                return Of(stepValue);
+
+            return Observable.FromAsync(async () =>
+            {
+                await scope.AddStep(stateId, defaultValue);
+                await source.ToTask();
+
+                return defaultValue;
+            });
         }
 
         public static StopAndWaitFactory<TSource> StopAndWait<TSource>(this IObservable<TSource> source) =>

@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.States;
+using Rx.Net.StateMachine.Tests.Persistence;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -58,22 +59,22 @@ namespace Rx.Net.StateMachine.Tests
             int messageId = await _botFake.SendUserMessage(boris, "/Start");
             await WaitUntilHandled(boris, messageId);
 
-            var botMessages = _botFake.ReadNewBotMessages(boris);
+            var botMessages = _botFake.ReadNewBotMessageTexts(boris);
             botMessages.Should().BeEquivalentTo("Hello, please follow steps to pass registration process", "Please enter your first name");
 
             messageId = await _botFake.SendUserMessage(boris, "Boris");
             await WaitUntilHandled(boris, messageId);
-            botMessages = _botFake.ReadNewBotMessages(boris);
+            botMessages = _botFake.ReadNewBotMessageTexts(boris);
             botMessages.Should().BeEquivalentTo("Please enter your last name");
 
             messageId = await _botFake.SendUserMessage(boris, "Sotsky");
             await WaitUntilHandled(boris, messageId);
-            botMessages = _botFake.ReadNewBotMessages(boris);
+            botMessages = _botFake.ReadNewBotMessageTexts(boris);
             botMessages.Should().BeEquivalentTo("Please enter your birth date");
 
             messageId = await _botFake.SendUserMessage(boris, new DateTime(1987, 6, 23).ToShortDateString());
             await WaitUntilHandled(boris, messageId);
-            botMessages = _botFake.ReadNewBotMessages(boris);
+            botMessages = _botFake.ReadNewBotMessageTexts(boris);
             var lastMessage = botMessages.Single();
             lastMessage.Should().Contain(boris.ToString());
             lastMessage.Should().Contain("Boris");
@@ -88,22 +89,22 @@ namespace Rx.Net.StateMachine.Tests
             int messageId = await _botFake.SendUserMessage(boris, "/Start");
             await WaitUntilHandled(boris, messageId);
 
-            var botMessages = _botFake.ReadNewBotMessages(boris);
+            var botMessages = _botFake.ReadNewBotMessageTexts(boris);
             botMessages.Should().BeEquivalentTo("Hello, please follow steps to pass registration process", "Please enter your first name");
 
             messageId = await _botFake.SendUserMessage(boris, "   ");
             await WaitUntilHandled(boris, messageId);
-            botMessages = _botFake.ReadNewBotMessages(boris);
+            botMessages = _botFake.ReadNewBotMessageTexts(boris);
             botMessages.Should().BeEquivalentTo("Oops first name is not valid, please try again", "Please enter your first name");
 
             messageId = await _botFake.SendUserMessage(boris, " ");
             await WaitUntilHandled(boris, messageId);
-            botMessages = _botFake.ReadNewBotMessages(boris);
+            botMessages = _botFake.ReadNewBotMessageTexts(boris);
             botMessages.Should().BeEquivalentTo("Oops first name is not valid, please try again", "Please enter your first name");
 
             messageId = await _botFake.SendUserMessage(boris, "Boris");
             await WaitUntilHandled(boris, messageId);
-            botMessages = _botFake.ReadNewBotMessages(boris);
+            botMessages = _botFake.ReadNewBotMessageTexts(boris);
             botMessages.Should().BeEquivalentTo("Please enter your last name");
         }
 

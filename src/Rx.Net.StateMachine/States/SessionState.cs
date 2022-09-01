@@ -9,12 +9,13 @@ namespace Rx.Net.StateMachine.States
 {
     public class SessionState
     {
-        public int Counter { get; private set; }
         private readonly Dictionary<string, SessionStateStep> _steps;
         private readonly List<PastSessionEvent> _pastEvents;
         private readonly List<SessionEvent> _events;
         private readonly List<SessionEventAwaiter> _sessionEventAwaiter;
 
+        public int Counter { get; private set; }
+        public object Context { get; private set; }
         public IReadOnlyDictionary<string, SessionStateStep> Steps => _steps;
         public IReadOnlyCollection<PastSessionEvent> PastEvents => _pastEvents;
         public IReadOnlyCollection<SessionEvent> Events => _events;
@@ -25,8 +26,9 @@ namespace Rx.Net.StateMachine.States
         public SessionStateStatus Status { get; set; }
         public string Result { get; set; }
 
-        public SessionState(int counter, Dictionary<string, SessionStateStep> steps, List<PastSessionEvent> pastEvents, List<SessionEventAwaiter> sessionEventAwaiter)
+        public SessionState(object context, int counter, Dictionary<string, SessionStateStep> steps, List<PastSessionEvent> pastEvents, List<SessionEventAwaiter> sessionEventAwaiter)
         {
+            Context = context;
             Counter = counter;
             _steps = steps;
             _pastEvents = pastEvents;
@@ -34,7 +36,7 @@ namespace Rx.Net.StateMachine.States
             _sessionEventAwaiter = sessionEventAwaiter;
         }
 
-        public SessionState() : this(0, new Dictionary<string, SessionStateStep>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
+        public SessionState(object context) : this(context, 0, new Dictionary<string, SessionStateStep>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
         {
             Status = SessionStateStatus.Created;
             Counter = 0;
@@ -57,16 +59,24 @@ namespace Rx.Net.StateMachine.States
                 throw new DuplicatedStepException(stateId);
         }
 
-        internal void AddEvent<TEvent>(TEvent @event)
+        internal void ForceAddEvent<TEvent>(TEvent @event)
+        {
+            var se = new SessionEvent(@event, GetSequenceNumber(), new SessionEventAwaiter[0]);
+
+            _events.Add(se);
+        }
+
+        internal  bool AddEvent<TEvent>(TEvent @event)
         {
             var eventTypeId = @event.GetType().GUID;
             var awaiters = _sessionEventAwaiter.Where(e => e.Type.GUID == eventTypeId).ToArray();
             if (awaiters.Length == 0)
-                return;
+                return false;
 
             var se = new SessionEvent(@event, GetSequenceNumber(), awaiters);
 
             _events.Add(se);
+            return true;
         }
 
         internal IEnumerable<TEvent> GetEvents<TEvent>(Func<TEvent, bool> filter, JsonSerializerOptions options)
@@ -111,6 +121,12 @@ namespace Rx.Net.StateMachine.States
         {
             Result = JsonSerializer.Serialize(result, options);
         }
+
+        internal MinimalSessionState ToMinimalState() => new MinimalSessionState
+        {
+            Steps = _steps,
+            Counter = Counter
+        };
 
         private int GetSequenceNumber() => ++Counter;
     }
