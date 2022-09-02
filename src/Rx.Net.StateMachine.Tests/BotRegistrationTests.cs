@@ -5,6 +5,7 @@ using Rx.Net.StateMachine.Tests.Persistence;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
@@ -137,25 +138,28 @@ namespace Rx.Net.StateMachine.Tests
             return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.UserId, "Hello, please follow steps to pass registration process"))
                 .Select(_ => new UserModel { Id = ctx.UserId })
                 .Persist(scope, "UserId")
-                .Select(user => GetFirstName(scope.BeginScope("FirstName")).Select(firstName =>
+                .SelectAsync(async user => GetFirstName(await scope.BeginRecursiveScope("FirstName")).Select(firstName =>
                 {
                     user.FirstName = firstName;
                     return user;
                 }))
                 .Concat()
+                .Concat()
                 .Persist(scope, "FirstName")
-                .Select(user => GetLastName(scope.BeginScope("LastName")).Select(lastName =>
+                .Select(async user => GetLastName(await scope.BeginRecursiveScope("LastName")).Select(lastName =>
                 {
                     user.LastName = lastName;
                     return user;
                 }))
                 .Concat()
+                .Concat()
                 .Persist(scope, "LastName")
-                .Select(user => GetBirthDate(scope.BeginScope("BirthDate")).Select(birthDate =>
+                .Select(async user => GetBirthDate(await scope.BeginRecursiveScope("BirthDate")).Select(birthDate =>
                 {
                     user.BirthDate = birthDate;
                     return user;
                 }))
+                .Concat()
                 .Concat()
                 .SelectAsync(async user =>
                 {
@@ -166,59 +170,60 @@ namespace Rx.Net.StateMachine.Tests
                 .Concat();
         }
 
-        private IObservable<string> GetFirstName(StateMachineScope scope, int attempt = 1)
+        private IObservable<string> RequestStringInput(StateMachineScope scope, string displayName, string stateName, Func<string, ValidationResult> validate)
         {
             var ctx = scope.GetContext<UserContext>();
-            return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.UserId, "Please enter your first name"))
-                .Persist(scope, $"AskUserFirstName-{attempt}")
-                .StopAndWait().For<BotFrameworkMessage>(scope, $"MessageReceived-{attempt}")
+            return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.UserId, $"Please enter your {displayName}"))
+                .Persist(scope, $"Ask{stateName}")
+                .StopAndWait().For<BotFrameworkMessage>(scope, "MessageReceived")
                 .Select(message =>
                 {
-                    if (!string.IsNullOrWhiteSpace(message.Text))
+                    string text = message.Text;
+                    var validationResult = validate(text);
+                    if(validationResult == ValidationResult.Success)
                         return StateMachineObservableExtensions.Of(message.Text);
 
-                    return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.UserId, "Oops first name is not valid, please try again"))
-                                .Persist(scope, $"InvalidFirstName-{attempt}")
-                                .Select(_ => GetFirstName(scope, attempt + 1))
+                    return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.UserId, validationResult.ErrorMessage))
+                                .Persist(scope, $"Invalid{stateName}")
+                                .IncreaseRecoursionDepth(scope)
+                                .Select(_ => GetFirstName(scope))
                                 .Concat();
                 }).Concat();
         }
 
-        private IObservable<string> GetLastName(StateMachineScope scope, int attempt = 1)
+        private IObservable<string> GetFirstName(StateMachineScope scope)
         {
-            var ctx = scope.GetContext<UserContext>();
-            return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.UserId, "Please enter your last name"))
-                .Persist(scope, $"AskUserLastName-{attempt}")
-                .StopAndWait().For<BotFrameworkMessage>(scope, $"MessageReceived-{attempt}")
-                .Select(message =>
-                {
-                    if (!string.IsNullOrWhiteSpace(message.Text))
-                        return StateMachineObservableExtensions.Of(message.Text);
+            return RequestStringInput(scope, "first name", "FirstName", s =>
+            {
+                if (string.IsNullOrWhiteSpace(s))
+                    return new ValidationResult("Oops first name is not valid, please try again");
 
-                    return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.UserId, "Oops last name is not valid, please try again"))
-                                .Persist(scope, $"InvalidLastName-{attempt}")
-                                .Select(_ => GetLastName(scope, attempt + 1))
-                                .Concat();
-                }).Concat();
+                return ValidationResult.Success;
+            });
         }
 
-        private IObservable<DateTime> GetBirthDate(StateMachineScope scope, int attempt = 1)
+        private IObservable<string> GetLastName(StateMachineScope scope)
         {
-            var ctx = scope.GetContext<UserContext>();
-            return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.UserId, "Please enter your birth date"))
-                .Persist(scope, $"AskUserBirthDate-{attempt}")
-                .StopAndWait().For<BotFrameworkMessage>(scope, $"MessageReceived-{attempt}")
-                .Select(message =>
-                {
-                    if (!string.IsNullOrWhiteSpace(message.Text) && DateTime.TryParse(message.Text, out var birthDate))
-                        return StateMachineObservableExtensions.Of(birthDate);
+            return RequestStringInput(scope, "last name", "LastName", s =>
+            {
+                if (string.IsNullOrWhiteSpace(s))
+                    return new ValidationResult("Oops last name is not valid, please try again");
 
-                    return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.UserId, "Oops birth date is not valid, please try again"))
-                                .SelectAsync(_ => _botFake.SendBotMessage(ctx.UserId, $"For example: {DateTime.Now.AddYears(-30).ToShortDateString()}"))
-                                .Persist(scope, $"InvalidBirthDate-{attempt}")
-                                .Select(_ => GetBirthDate(scope, attempt + 1))
-                                .Concat();
-                }).Concat();
+                return ValidationResult.Success;
+            });
+        }
+
+        private IObservable<DateTime> GetBirthDate(StateMachineScope scope)
+        {
+            return RequestStringInput(scope, "birth date", "BirthDate", s =>
+            {
+                if (string.IsNullOrWhiteSpace(s))
+                    return new ValidationResult("Oops birth date is not valid, please try again");
+                if(!DateTime.TryParse(s, out var birthDate))
+                    return new ValidationResult("Oops birth date is not valid, please try again");
+
+                return ValidationResult.Success;
+            }).Select(birhDate => DateTime.Parse(birhDate));
         }
     }
 }

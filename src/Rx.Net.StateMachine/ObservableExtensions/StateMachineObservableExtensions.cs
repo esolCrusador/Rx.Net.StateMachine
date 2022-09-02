@@ -12,6 +12,14 @@ namespace Rx.Net.StateMachine.ObservableExtensions
 {
     public static class StateMachineObservableExtensions
     {
+        public static IObservable<TSource> IncreaseRecoursionDepth<TSource>(this IObservable<TSource> source, StateMachineScope scope)
+        {
+            return source.SelectAsync(async s =>
+            {
+                await scope.IncreaseRecursionDepth();
+                return s;
+            }).Concat();
+        }
         public static IObservable<TSource> Persist<TSource>(this IObservable<TSource> source, StateMachineScope scope, string stateId)
         {
             if (scope.TryGetStep<TSource>(stateId, out var stepValue))

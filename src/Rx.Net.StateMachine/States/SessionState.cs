@@ -53,10 +53,23 @@ namespace Rx.Net.StateMachine.States
             return true;
         }
 
+        internal TStep GetStep<TStep>(string stateId, JsonSerializerOptions options)
+        {
+            if (!TryGetStep<TStep>(stateId, options, out var step))
+                throw new StepNotFoundException(stateId);
+
+            return step;
+        }
+
         internal void AddStep<Tsource>(string stateId, Tsource source, JsonSerializerOptions options)
         {
             if (!_steps.TryAdd(stateId, new SessionStateStep(JsonSerializer.Serialize(source, options), GetSequenceNumber())))
                 throw new DuplicatedStepException(stateId);
+        }
+
+        internal void UpdateStep<TSource>(string stepId, TSource source, JsonSerializerOptions options)
+        {
+            _steps[stepId].UpdateState(JsonSerializer.Serialize(source, options));
         }
 
         internal void ForceAddEvent<TEvent>(TEvent @event)
@@ -66,7 +79,7 @@ namespace Rx.Net.StateMachine.States
             _events.Add(se);
         }
 
-        internal  bool AddEvent<TEvent>(TEvent @event)
+        internal bool AddEvent<TEvent>(TEvent @event)
         {
             var eventTypeId = @event.GetType().GUID;
             var awaiters = _sessionEventAwaiter.Where(e => e.Type.GUID == eventTypeId).ToArray();

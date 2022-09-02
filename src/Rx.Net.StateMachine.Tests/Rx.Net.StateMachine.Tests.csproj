@@ -13,4 +13,8 @@
     <ProjectReference Include="..\Rx.Net.StateMachine\Rx.Net.StateMachine.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Validation\" />
+  </ItemGroup>
+
 </Project>
