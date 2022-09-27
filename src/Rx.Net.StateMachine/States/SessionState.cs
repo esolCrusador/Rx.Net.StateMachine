@@ -14,6 +14,7 @@ namespace Rx.Net.StateMachine.States
         private readonly List<SessionEvent> _events;
         private readonly List<SessionEventAwaiter> _sessionEventAwaiter;
 
+        public string WorkflowId { get; private set; }
         public int Counter { get; private set; }
         public object Context { get; private set; }
         public IReadOnlyDictionary<string, SessionStateStep> Steps => _steps;
@@ -26,8 +27,9 @@ namespace Rx.Net.StateMachine.States
         public SessionStateStatus Status { get; set; }
         public string Result { get; set; }
 
-        public SessionState(object context, int counter, Dictionary<string, SessionStateStep> steps, List<PastSessionEvent> pastEvents, List<SessionEventAwaiter> sessionEventAwaiter)
+        public SessionState(string workflowId, object context, int counter, Dictionary<string, SessionStateStep> steps, List<PastSessionEvent> pastEvents, List<SessionEventAwaiter> sessionEventAwaiter)
         {
+            WorkflowId = workflowId;
             Context = context;
             Counter = counter;
             _steps = steps;
@@ -36,10 +38,9 @@ namespace Rx.Net.StateMachine.States
             _sessionEventAwaiter = sessionEventAwaiter;
         }
 
-        public SessionState(object context) : this(context, 0, new Dictionary<string, SessionStateStep>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
+        public SessionState(string workflowId, object context) : this(workflowId, context, 0, new Dictionary<string, SessionStateStep>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
         {
             Status = SessionStateStatus.Created;
-            Counter = 0;
         }
 
         internal bool TryGetStep<TSource>(string stateId, JsonSerializerOptions options, out TSource source)
@@ -137,6 +138,7 @@ namespace Rx.Net.StateMachine.States
 
         internal MinimalSessionState ToMinimalState() => new MinimalSessionState
         {
+            WorkflowId = WorkflowId,
             Steps = _steps,
             Counter = Counter
         };

@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq.Expressions;
+using System.Reactive;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -21,6 +22,8 @@ namespace Rx.Net.StateMachine
         public StateMachine StateMachine { get; }
         public SessionState SessionState { get; }
         public ISessionStateStorage SessionStateStorage { get; }
+
+        public IObservable<Unit> Persisted => SessionStateStorage.Persisted;
 
         public StateMachineScope(StateMachine stateMachine, SessionState sessionState, ISessionStateStorage sessionStateRepository, string prefix = null)
         {

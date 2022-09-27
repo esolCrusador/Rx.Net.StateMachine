@@ -1,4 +1,5 @@
 ﻿using Rx.Net.StateMachine.ObservableExtensions;
+using Rx.Net.StateMachine.States;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -33,6 +34,32 @@ namespace Rx.Net.StateMachine.ObservableExtensions
             }).Concat();
         }
 
+        public static IObservable<TSource> BeforeNextPersist<TSource>(this IObservable<TSource> source, StateMachineScope scope, Action<TSource> action)
+        {
+            TSource value = default;
+            var subscription = scope.Persisted.Subscribe(_ => action(value));
+
+            return source.Select(s => value = s).Finally(() => subscription.Dispose());
+        }
+
+        public static IObservable<TSource> BeforeNextPersist<TSource>(this IObservable<TSource> source, StateMachineScope scope, Func<TSource, Task> action)
+        {
+            bool isExecuted = false;
+            TSource lastValue = default;
+            var subscription = scope.Persisted.Subscribe(_ =>
+            {
+                if (isExecuted)
+                    action(lastValue);
+            });
+
+            return source.Select(value =>
+            {
+                isExecuted = true;
+                lastValue = value;
+                return value;
+            }).Finally(() => subscription.Dispose());
+        }
+
         public static IObservable<TSource> PersistBeforePrevious<TSource>(this IObservable<TSource> source, StateMachineScope scope, string stateId, TSource defaultValue = default)
         {
             if (scope.TryGetStep<TSource>(stateId, out var stepValue))
@@ -50,7 +77,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
         public static StopAndWaitFactory<TSource> StopAndWait<TSource>(this IObservable<TSource> source) =>
             new StopAndWaitFactory<TSource>(source);
 
-        public static IObservable<TEvent> StopAndWait<TEvent>(StateMachineScope scope, string stateId, Func<TEvent, bool> matches = null)
+        public static IObservable<TEvent> StopAndWait<TEvent>(this StateMachineScope scope, string stateId, Func<TEvent, bool> matches = null)
         {
             return StopAndWait<TEvent>(scope, matches).Persist(scope, stateId);
         }
@@ -62,7 +89,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
         {
             var notHandledEvents = scope.GetEvents(matches).ToList();
 
-            if(notHandledEvents.Count != 0)
+            if (notHandledEvents.Count != 0)
             {
                 return notHandledEvents.ToObservable().SelectAsync(async e =>
                 {

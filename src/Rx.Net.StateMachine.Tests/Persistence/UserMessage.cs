@@ -9,6 +9,7 @@ namespace Rx.Net.StateMachine.Tests.Persistence
         public Guid UserId { get; }
         public string Text { get; }
         public IReadOnlyCollection<KeyValuePair<string, string>> Buttons { get; set; }
+        public int? ReplyToMessageId { get; set; }
         public BotFrameworkMessage(int messageId, Guid userId, string text)
         {
             MessageId = messageId;

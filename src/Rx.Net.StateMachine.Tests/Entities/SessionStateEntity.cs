@@ -12,6 +12,7 @@ namespace Rx.Net.StateMachine.Tests
             public Guid SessionId { get; set; }
             public Guid UserId { get; set; }
 
+            public string WorkflowId { get; set; }
             public int Counter { get; set; }
             public List<SessionStepEntity> Steps { get; set; }
             public List<SessionEventEntity> PastEvents { get; set; }
