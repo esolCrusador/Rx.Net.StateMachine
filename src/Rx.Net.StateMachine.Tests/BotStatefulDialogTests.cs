@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.States;
+using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
 using Rx.Net.StateMachine.WorkflowFactories;
 using System;
@@ -60,7 +61,7 @@ namespace Rx.Net.StateMachine.Tests
         public async Task Should_React_On_Play_Button()
         {
             await ShowItems();
-            var messages = _botFake.ReadNewMessages(_userId);
+            var messages = _botFake.ReadNewBotMessages(_userId);
             var secondMessage = messages.Skip(1).First();
 
             await _botFake.ClickButton(secondMessage, secondMessage.Buttons.First().Value);
@@ -72,7 +73,7 @@ namespace Rx.Net.StateMachine.Tests
         public async Task Should_React_On_Pause_Button()
         {
             await ShowItems();
-            var messages = _botFake.ReadNewMessages(_userId);
+            var messages = _botFake.ReadNewBotMessages(_userId);
             var secondMessage = messages.Skip(1).First();
 
             await _botFake.ClickButton(secondMessage, secondMessage.Buttons.First().Value);
@@ -86,7 +87,7 @@ namespace Rx.Net.StateMachine.Tests
         public async Task Should_React_On_Delete_Button()
         {
             await ShowItems();
-            var messages = _botFake.ReadNewMessages(_userId);
+            var messages = _botFake.ReadNewBotMessages(_userId);
             var secondMessage = messages.Skip(1).First();
 
             await _botFake.ClickButton(secondMessage, secondMessage.Buttons.Last().Value);
@@ -100,11 +101,11 @@ namespace Rx.Net.StateMachine.Tests
         {
             await ShowItems();
 
-            var messages = _botFake.ReadNewMessages(_userId);
+            var messages = _botFake.ReadNewBotMessages(_userId);
             var secondMessage = messages.Skip(1).First();
 
             await _botFake.ClickButton(secondMessage, secondMessage.Buttons.Skip(1).First().Value);
-            var confirmation = _botFake.ReadNewMessages(_userId).Single();
+            var confirmation = _botFake.ReadNewBotMessages(_userId).Single();
 
             await _botFake.ClickButton(secondMessage, confirmation.Buttons.First(b => b.Key == "Yes").Value);
         }

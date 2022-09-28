@@ -13,7 +13,5 @@ namespace Rx.Net.StateMachine.States
             State = state;
             SequenceNumber = sequenceNumber;
         }
-
-        internal void UpdateState(string state) => State = state;
     }
 }

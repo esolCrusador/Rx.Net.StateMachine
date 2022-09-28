@@ -41,10 +41,10 @@ namespace Rx.Net.StateMachine
 
         public async Task<StateMachineScope> BeginRecursiveScope(string prefix)
         {
-            if (!SessionState.TryGetStep(GetDepthName(prefix), StateMachine.SerializerOptions, out int depth))
+            if (!SessionState.TryGetItem(GetDepthName(prefix), StateMachine.SerializerOptions, out int depth))
             {
                 depth = 1;
-                await AddStep(GetDepthName(prefix), depth);
+                await AddItem(GetDepthName(prefix), depth);
             }
 
             return new StateMachineScope(StateMachine, SessionState, SessionStateStorage, AddPrefix(prefix));
@@ -54,7 +54,7 @@ namespace Rx.Net.StateMachine
         {
             int depth = GetRecoursionDepth() ?? throw new StepNotFoundException(GetDepthName(StatePrefix));
             depth++;
-            await UpdateStep(GetDepthName(StatePrefix), depth);
+            await UpdateItem(GetDepthName(StatePrefix), depth);
 
             return this;
         }
@@ -69,11 +69,18 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistStepState(SessionState);
         }
 
-        private Task UpdateStep<TState>(string stateId, TState stepState)
+        public Task AddItem<TItem>(string itemId, TItem item)
         {
-            SessionState.UpdateStep(stateId, stepState, StateMachine.SerializerOptions);
+            SessionState.AddItem(AddPrefix(itemId), item, StateMachine.SerializerOptions);
 
-            return SessionStateStorage.PersistStepState(SessionState);
+            return SessionStateStorage.PersistItemState(SessionState);
+        }
+
+        public Task UpdateItem<TItem>(string itemId, TItem item)
+        {
+            SessionState.UpdateItem(itemId, item, StateMachine.SerializerOptions);
+
+            return SessionStateStorage.PersistItemState(SessionState);
         }
 
         public Task AddEvent<TEvent>(TEvent @event)
@@ -112,7 +119,7 @@ namespace Rx.Net.StateMachine
         private int? GetRecoursionDepth()
         {
             string depthName = GetDepthName(StatePrefix);
-            if (!SessionState.TryGetStep<int>(depthName, StateMachine.SerializerOptions, out var depth))
+            if (!SessionState.TryGetItem<int>(depthName, StateMachine.SerializerOptions, out var depth))
                 return null;
 
             return depth;

@@ -11,6 +11,7 @@ namespace Rx.Net.StateMachine.Storage
     {
         IObservable<Unit> Persisted { get; }
         Task PersistStepState(SessionState sessionState);
+        Task PersistItemState(SessionState sessionState);
         Task PersistEventState(SessionState sessionState);
         Task PersistEventAwaiter(SessionState sessionState);
         Task PersistSessionState(SessionState sessionState);

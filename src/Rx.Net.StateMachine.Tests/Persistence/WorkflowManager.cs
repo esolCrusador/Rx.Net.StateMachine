@@ -75,6 +75,7 @@ namespace Rx.Net.StateMachine.Tests
                 WorkflowId = workflowId,
                 Status = SessionStateStatus.Created,
                 Steps = new List<SessionStepEntity>(),
+                Items = new List<SessionItemEntity>(),
                 Awaiters = new List<SessionEventAwaiterEntity>(),
                 Counter = 0,
                 PastEvents = new List<SessionEventEntity>(),
@@ -127,6 +128,7 @@ namespace Rx.Net.StateMachine.Tests
                 context,
                 entity.Counter,
                 entity.Steps.ToDictionary(s => s.Id, s => new SessionStateStep(s.State, s.SequenceNumber)),
+                entity.Items.ToDictionary(i => i.Id, i => i.Value),
                 MapSessionEvents(entity.PastEvents),
                 entity.Awaiters.Select(aw => new SessionEventAwaiter(aw.AwaiterId, aw.TypeName, aw.SequenceNumber)).ToList()
             )
@@ -145,6 +147,12 @@ namespace Rx.Net.StateMachine.Tests
                         Id = kvp.Key,
                         State = kvp.Value.State,
                         SequenceNumber = kvp.Value.SequenceNumber
+                    }).ToList();
+            dest.Items = state.Items.Select(kvp =>
+                    new SessionItemEntity
+                    {
+                        Id = kvp.Key,
+                        Value = kvp.Value
                     }).ToList();
             dest.PastEvents = MapSessionEventEntities(state.PastEvents);
             dest.Awaiters = state.SessionEventAwaiters.Select(aw => new SessionEventAwaiterEntity

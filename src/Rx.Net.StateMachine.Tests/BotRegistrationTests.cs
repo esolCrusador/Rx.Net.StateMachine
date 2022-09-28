@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.States;
+using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
 using Rx.Net.StateMachine.WorkflowFactories;
 using System;
