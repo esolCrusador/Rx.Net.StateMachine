@@ -34,32 +34,6 @@ namespace Rx.Net.StateMachine.ObservableExtensions
             }).Concat();
         }
 
-        public static IObservable<TSource> BeforeNextPersist<TSource>(this IObservable<TSource> source, StateMachineScope scope, Action<TSource> action)
-        {
-            TSource value = default;
-            var subscription = scope.Persisted.Subscribe(_ => action(value));
-
-            return source.Select(s => value = s).Finally(() => subscription.Dispose());
-        }
-
-        public static IObservable<TSource> BeforeNextPersist<TSource>(this IObservable<TSource> source, StateMachineScope scope, Func<TSource, Task> action)
-        {
-            bool isExecuted = false;
-            TSource lastValue = default;
-            var subscription = scope.Persisted.Subscribe(_ =>
-            {
-                if (isExecuted)
-                    action(lastValue);
-            });
-
-            return source.Select(value =>
-            {
-                isExecuted = true;
-                lastValue = value;
-                return value;
-            }).Finally(() => subscription.Dispose());
-        }
-
         public static IObservable<TSource> PersistBeforePrevious<TSource>(this IObservable<TSource> source, StateMachineScope scope, string stateId, TSource defaultValue = default)
         {
             if (scope.TryGetStep<TSource>(stateId, out var stepValue))

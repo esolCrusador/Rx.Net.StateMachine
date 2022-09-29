@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.States;
+using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
 using Rx.Net.StateMachine.WorkflowFactories;
@@ -251,10 +252,10 @@ namespace Rx.Net.StateMachine.Tests
                         new KeyValuePair<string, string>("No", "no")
                     ))
                     .Persist(scope, "ChangeNameConfirmation")
+                    .PersistMessageId(scope)
                     .Select(messageId =>
                         scope.StopAndWait<BotFrameworkButtonClick>("ChangeNameConfirmationWait")
                         .Select(click => click.SelectedValue == "yes")
-                        .BeforeNextPersist(scope, _ => _botFake.DeleteBotMessage(context.UserId, messageId))
                     ).Concat()
                     .Select(changeName =>
                     {
@@ -263,6 +264,8 @@ namespace Rx.Net.StateMachine.Tests
 
                         return UpdateItemName(item, scope.BeginRecursiveScope("Name"));
                     })
+                    .Concat()
+                    .SelectAsync(_ => scope.DeleteMessageIds())
                     .Concat();
                 }).Concat();
             }
@@ -276,28 +279,29 @@ namespace Rx.Net.StateMachine.Tests
 
                         return Observable.FromAsync(() =>
                             _botFake.SendBotMessage(context.UserId, "Please enter name"))
+                                .PersistMessageId(scope)
                                 .Select(messageId =>
                                     scope.StopAndWait<BotFrameworkMessage>("NameInput")
                                     .Select(nameInput =>
                                     {
                                         if (string.IsNullOrEmpty(nameInput.Text))
                                             return Observable.FromAsync(() => _botFake.SendBotMessage(context.UserId, "Name is not valid", nameInput.MessageId))
-                                                .Select(errorMessageId =>
+                                                .PersistMessageId(scope)
+                                                .Select(_ =>
                                                         UpdateItemName(item, scope.IncreaseRecursionDepth())
-                                                        .BeforeNextPersist(scope, _ => _botFake.DeleteBotMessage(context.UserId, errorMessageId))
                                                 ).Concat();
 
                                         return Observable.FromAsync(() => _itemsManager.UpdateItem(item.Id, i => i.Name = nameInput.Text))
                                             .Select(_ => Unit.Default);
                                     })
                                     .Concat()
-                                    .BeforeNextPersist(scope, async replyMessageId =>
+                                    .SelectAsync(async _ =>
                                     {
-                                        await Task.WhenAll(
-                                            _botFake.DeleteBotMessage(context.UserId, messageId),
-                                            _botFake.DeleteUserMessage(context.UserId, messageId)
-                                        );
+                                        var messages = scope.GetMessageIds();
+                                        await Task.WhenAll(messages.Select(messageId => _botFake.DeleteBotMessage(context.UserId, messageId)));
+                                        await scope.DeleteMessageIds();
                                     })
+                                    .Concat()
                                 ).Concat();
                     }).Concat();
             }

@@ -108,7 +108,7 @@ namespace Rx.Net.StateMachine.States
                 AddItem(itemId, createAction(), options);
         }
 
-        internal bool TryGetItem<TSource>(string itemId, JsonSerializerOptions options, out TSource item)
+        internal bool TryGetItem<TItem>(string itemId, JsonSerializerOptions options, out TItem item)
         {
             if (!_items.TryGetValue(itemId, out string itemString))
             {
@@ -116,11 +116,18 @@ namespace Rx.Net.StateMachine.States
                 return false;
             }
 
-            item = JsonSerializer.Deserialize<TSource>(itemString, options);
+            item = JsonSerializer.Deserialize<TItem>(itemString, options);
             return true;
         }
 
-        internal void DeleteItem<Tsource>(string itemId)
+        internal TItem GetItem<TItem>(string itemId, JsonSerializerOptions options){
+            if (!TryGetItem<TItem>(itemId, options, out var item))
+                throw new ItemNotFoundException(itemId);
+
+            return item;
+        }
+
+        internal void DeleteItem(string itemId)
         {
             if (!_items.Remove(itemId))
                 throw new ItemNotFoundException(itemId);

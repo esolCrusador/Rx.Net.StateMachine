@@ -23,8 +23,6 @@ namespace Rx.Net.StateMachine
         public SessionState SessionState { get; }
         public ISessionStateStorage SessionStateStorage { get; }
 
-        public IObservable<Unit> Persisted => SessionStateStorage.Persisted;
-
         public StateMachineScope(StateMachine stateMachine, SessionState sessionState, ISessionStateStorage sessionStateRepository, string prefix = null)
         {
             StateMachine = stateMachine;
@@ -41,10 +39,13 @@ namespace Rx.Net.StateMachine
 
         public async Task<StateMachineScope> BeginRecursiveScope(string prefix)
         {
-            if (!SessionState.TryGetItem(GetDepthName(prefix), StateMachine.SerializerOptions, out int depth))
+            string depthName = GetDepthName(prefix);
+            if (!SessionState.TryGetItem(depthName, StateMachine.SerializerOptions, out int depth))
             {
                 depth = 1;
-                await AddItem(GetDepthName(prefix), depth);
+                SessionState.AddItem(depthName, depth, StateMachine.SerializerOptions);
+
+                await SessionStateStorage.PersistItemState(SessionState);
             }
 
             return new StateMachineScope(StateMachine, SessionState, SessionStateStorage, AddPrefix(prefix));
@@ -52,9 +53,12 @@ namespace Rx.Net.StateMachine
 
         public async Task<StateMachineScope> IncreaseRecursionDepth()
         {
-            int depth = GetRecoursionDepth() ?? throw new StepNotFoundException(GetDepthName(StatePrefix));
+            var depthName = GetDepthName(StatePrefix);
+            int depth = GetRecoursionDepth() ?? throw new ItemNotFoundException(depthName);
             depth++;
-            await UpdateItem(GetDepthName(StatePrefix), depth);
+            SessionState.UpdateItem(depthName, depth, StateMachine.SerializerOptions);
+
+            await SessionStateStorage.PersistItemState(SessionState);
 
             return this;
         }
@@ -76,9 +80,28 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
+        public Task AddOrUpdateItem<TItem>(string itemId, Func<TItem> getItemToAdd, Func<TItem, TItem> updateItem)
+        {
+            SessionState.AddOrUpdateItem(AddPrefix(itemId), getItemToAdd, updateItem, StateMachine.SerializerOptions);
+
+            return SessionStateStorage.PersistItemState(SessionState);
+        }
+
         public Task UpdateItem<TItem>(string itemId, TItem item)
         {
-            SessionState.UpdateItem(itemId, item, StateMachine.SerializerOptions);
+            SessionState.UpdateItem(AddPrefix(itemId), item, StateMachine.SerializerOptions);
+
+            return SessionStateStorage.PersistItemState(SessionState);
+        }
+
+        public TItem GetItem<TItem>(string itemId)
+        {
+            return SessionState.GetItem<TItem>(itemId, StateMachine.SerializerOptions);
+        }
+
+        public Task DeleteItem(string itemId)
+        {
+            SessionState.DeleteItem(itemId);
 
             return SessionStateStorage.PersistItemState(SessionState);
         }
