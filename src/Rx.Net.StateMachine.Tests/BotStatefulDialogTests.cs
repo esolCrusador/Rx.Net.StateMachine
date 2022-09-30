@@ -256,6 +256,11 @@ namespace Rx.Net.StateMachine.Tests
                     .Select(messageId =>
                         scope.StopAndWait<BotFrameworkButtonClick>("ChangeNameConfirmationWait")
                         .Select(click => click.SelectedValue == "yes")
+                        .FinallyAsync(async (isExecuted, _, ex) =>
+                        {
+                            if (isExecuted)
+                                await _botFake.DeleteBotMessage(context.UserId, messageId);
+                        })
                     ).Concat()
                     .Select(changeName =>
                     {
@@ -295,13 +300,7 @@ namespace Rx.Net.StateMachine.Tests
                                             .Select(_ => Unit.Default);
                                     })
                                     .Concat()
-                                    .SelectAsync(async _ =>
-                                    {
-                                        var messages = scope.GetMessageIds();
-                                        await Task.WhenAll(messages.Select(messageId => _botFake.DeleteBotMessage(context.UserId, messageId)));
-                                        await scope.DeleteMessageIds();
-                                    })
-                                    .Concat()
+                                    .DeleteMssages(scope, _botFake)
                                 ).Concat();
                     }).Concat();
             }

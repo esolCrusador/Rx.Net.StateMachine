@@ -157,23 +157,28 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         private List<BotFrameworkMessage> GetUserMessages(Guid userId) =>
             _messages.GetOrAdd(userId, new List<BotFrameworkMessage>());
 
-        public override string ToString()
+        public string MessagesLog
         {
-            var chats = _messages.Select(m =>
+            get
             {
-                var chatMessages = m.Value.Select(m =>
+                var chats = _messages.Select(m =>
                 {
-                    string message = $"[{m.MessageId}] {(m.Source == MessageSource.User ? "User" : "Bot")}: {m.Text}";
-                    if (m.Buttons != null && m.Buttons.Count > 0)
-                        message += $"\r\n{string.Join(", ", m.Buttons.Select(b => $"[{b.Key}]"))}";
+                    var chatMessages = m.Value.Select(m =>
+                    {
+                        string message = $"[{m.MessageId}] {(m.Source == MessageSource.User ? "User" : "Bot")}: {m.Text}";
+                        if (m.Buttons != null && m.Buttons.Count > 0)
+                            message += $"\r\n{string.Join(", ", m.Buttons.Select(b => $"[{b.Key}]"))}";
 
-                    return message;
+                        return message;
+                    });
+
+                    return $"{m.Key}:\r\n{string.Join("\r\n", chatMessages)}";
                 });
 
-                return $"{m.Key}:\r\n{string.Join("\r\n", chatMessages)}";
-            });
-
-            return string.Join(";\r\n", chats);
+                return string.Join(";\r\n", chats);
+            }
         }
+
+        public override string ToString() => MessagesLog;
     }
 }
