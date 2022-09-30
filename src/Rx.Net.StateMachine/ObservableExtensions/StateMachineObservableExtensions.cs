@@ -1,4 +1,5 @@
 ﻿using Rx.Net.StateMachine.ObservableExtensions;
+using Rx.Net.StateMachine.States;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -50,7 +51,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
         public static StopAndWaitFactory<TSource> StopAndWait<TSource>(this IObservable<TSource> source) =>
             new StopAndWaitFactory<TSource>(source);
 
-        public static IObservable<TEvent> StopAndWait<TEvent>(StateMachineScope scope, string stateId, Func<TEvent, bool> matches = null)
+        public static IObservable<TEvent> StopAndWait<TEvent>(this StateMachineScope scope, string stateId, Func<TEvent, bool> matches = null)
         {
             return StopAndWait<TEvent>(scope, matches).Persist(scope, stateId);
         }
@@ -62,7 +63,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
         {
             var notHandledEvents = scope.GetEvents(matches).ToList();
 
-            if(notHandledEvents.Count != 0)
+            if (notHandledEvents.Count != 0)
             {
                 return notHandledEvents.ToObservable().SelectAsync(async e =>
                 {
