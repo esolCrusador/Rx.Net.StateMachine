@@ -32,6 +32,11 @@ namespace Rx.Net.StateMachine.Tests.Fakes
             return ReadNewBotMessages(userId).Select(m => m.Text).ToList();
         }
 
+        public IReadOnlyCollection<string> ReadAllMessageTexts(Guid userId)
+        {
+            return GetUserMessages(userId).Select(m => m.Text).ToList();
+        }
+
         public IReadOnlyCollection<BotFrameworkMessage> ReadNewBotMessages(Guid userId)
         {
             var lastReadMessageId = _lastReadMessageIds.GetOrAdd(userId, 0);
@@ -103,7 +108,7 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         public Task<int> SendUserMessage(Guid userId, string messageText)
         {
             var messages = GetUserMessages(userId);
-            int messageId = messages.LastOrDefault()?.MessageId ?? 0 + 1;
+            int messageId = GetNextBotMessageId(userId);
             var message = new BotFrameworkMessage(messageId, userId, MessageSource.User, messageText);
             messages.Add(message);
             _userMessagesSubject.OnNext(message);
@@ -121,8 +126,6 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         {
             var messages = GetUserMessages(userId);
             messages.RemoveAt(messages.FindIndex(m => m.MessageId == messageId));
-            if (_lastReadMessageIds.TryGetValue(userId, out int messageCounter))
-                _lastReadMessageIds[userId] = messageCounter - 1;
 
             return Task.CompletedTask;
         }

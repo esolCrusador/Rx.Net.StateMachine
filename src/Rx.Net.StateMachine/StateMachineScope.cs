@@ -96,7 +96,20 @@ namespace Rx.Net.StateMachine
 
         public TItem GetItem<TItem>(string itemId)
         {
-            return SessionState.GetItem<TItem>(itemId, StateMachine.SerializerOptions);
+            return SessionState.GetItem<TItem>(AddPrefix(itemId), StateMachine.SerializerOptions);
+        }
+
+        /// <summary>
+        /// Gets multiple items if scope is recoursive if not gets single item
+        /// </summary>
+        public IEnumerable<TItem> GetItems<TItem>(string itemId)
+        {
+            var recoursionDepth = GetRecoursionDepth();
+            if (recoursionDepth == null)
+                yield return GetItem<TItem>(itemId);
+
+            while (recoursionDepth > 0)
+                yield return SessionState.GetItem<TItem>(AddPrefix(StatePrefix, recoursionDepth--, itemId), StateMachine.SerializerOptions);
         }
 
         public Task DeleteItem(string itemId)
@@ -148,16 +161,18 @@ namespace Rx.Net.StateMachine
             return depth;
         }
 
-        private string AddPrefix(string stateId)
+        private string AddPrefix(string stateId) =>
+            AddPrefix(StatePrefix, GetRecoursionDepth(), stateId);
+
+        private static string AddPrefix(string prefix, int? recoursionDepth, string stateId)
         {
-            if (StatePrefix == null)
+            if (prefix == null)
                 return stateId;
 
-            int? depth = GetRecoursionDepth();
-            if (depth == null)
-                return $"{StatePrefix}.{stateId}";
+            if (recoursionDepth == null)
+                return $"{prefix}.{stateId}";
 
-            return $"{StatePrefix}-{depth}.{stateId}";
+            return $"{prefix}-{recoursionDepth}.{stateId}";
         }
     }
 }
