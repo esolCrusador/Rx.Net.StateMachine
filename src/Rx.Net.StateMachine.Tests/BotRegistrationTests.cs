@@ -29,9 +29,9 @@ namespace Rx.Net.StateMachine.Tests
     }
     public class BotRegistrationTests : IDisposable
     {
-        private readonly SessionStateDataStore _dataStore;
+        private readonly SessionStateDataStore<TestSessionStateEntity> _dataStore;
         private readonly WorkflowResolver _workflowResolver;
-        private readonly WorkflowManager _workflowManager;
+        private readonly WorkflowManager<TestSessionStateEntity, UserContext> _workflowManager;
         private readonly IDisposable _messagesHandling;
         private readonly BotFake _botFake;
 
@@ -40,10 +40,11 @@ namespace Rx.Net.StateMachine.Tests
         public BotRegistrationTests()
         {
             _botFake = new BotFake();
-            _dataStore = new SessionStateDataStore();
+            _dataStore = new SessionStateDataStore<TestSessionStateEntity>();
             _workflowResolver = new WorkflowResolver(new BotRegistrationWorkflowFactory(_botFake));
 
-            _workflowManager = new WorkflowManager(
+            _workflowManager = new WorkflowManager<TestSessionStateEntity, UserContext>(
+                new TestSessionStateContext(),
                 new JsonSerializerOptions(),
                 () => new SessionStateUnitOfWork(_dataStore),
                 _workflowResolver

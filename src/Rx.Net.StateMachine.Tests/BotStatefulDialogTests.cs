@@ -24,27 +24,28 @@ namespace Rx.Net.StateMachine.Tests
         private readonly StateMachine _stateMachine = new StateMachine();
         private readonly Guid _userId = Guid.NewGuid();
         private readonly WorkflowResolver _workflowResolver;
-        private readonly WorkflowManager _workflowManager;
+        private readonly WorkflowManager<TestSessionStateEntity, UserContext> _workflowManager;
         private readonly BotFake _botFake;
         private readonly ItemsManager _itemsManager;
 
         public BotStatefulDialogTests()
         {
             _botFake = new BotFake();
-            var dataStore = new SessionStateDataStore();
+            var dataStore = new SessionStateDataStore<TestSessionStateEntity>();
             _itemsManager = new ItemsManager(
                 new Item { Id = Guid.NewGuid(), Name = "Task 1", Status = ItemStatus.ToDo },
                 new Item { Id = Guid.NewGuid(), Name = "Task 2", Status = ItemStatus.ToDo },
                 new Item { Id = Guid.NewGuid(), Name = "Task 3", Status = ItemStatus.InProgress }
             );
 
-            var workflowManagerAccessor = new WorkflowManagerAccessor();
+            var workflowManagerAccessor = new WorkflowManagerAccessor<TestSessionStateEntity, UserContext>();
             _workflowResolver = new WorkflowResolver(
                 new TaskActionsWorkflowFactory(_botFake, _itemsManager, new StateMachine(), workflowManagerAccessor),
                 new EditItemWorkflowFactory(_botFake, _itemsManager)
             );
 
-            _workflowManager = new WorkflowManager(
+            _workflowManager = new WorkflowManager<TestSessionStateEntity, UserContext>(
+                new TestSessionStateContext(),
                 new JsonSerializerOptions(),
                 () => new SessionStateUnitOfWork(dataStore),
                 _workflowResolver
@@ -152,9 +153,9 @@ namespace Rx.Net.StateMachine.Tests
             private readonly BotFake _botFake;
             private readonly ItemsManager _itemsManager;
             private readonly StateMachine _stateMachine;
-            private readonly WorkflowManagerAccessor _workflowManagerAccessor;
+            private readonly WorkflowManagerAccessor<TestSessionStateEntity, UserContext> _workflowManagerAccessor;
 
-            public TaskActionsWorkflowFactory(BotFake botFake, ItemsManager itemsManager, StateMachine stateMachine, WorkflowManagerAccessor workflowManagerAccessor)
+            public TaskActionsWorkflowFactory(BotFake botFake, ItemsManager itemsManager, StateMachine stateMachine, WorkflowManagerAccessor<TestSessionStateEntity, UserContext> workflowManagerAccessor)
             {
                 _botFake = botFake;
                 _itemsManager = itemsManager;

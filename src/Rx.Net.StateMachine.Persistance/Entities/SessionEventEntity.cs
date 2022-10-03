@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Rx.Net.StateMachine.Tests.Entities
+namespace Rx.Net.StateMachine.Persistance.Entities
 {
     public class SessionEventEntity
     {
