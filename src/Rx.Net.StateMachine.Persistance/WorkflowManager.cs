@@ -31,11 +31,14 @@ namespace Rx.Net.StateMachine.Tests
             _options = options;
             _uofFactory = uofFactory;
             _workflowResolver = workflowResolver;
-            _stateMachine = new StateMachine { SerializerOptions = new JsonSerializerOptions() };
+            _stateMachine = new StateMachine(options);
         }
 
         public async Task<HandlingResult> StartHandle(string workflowId, TContext context)
         {
+            if(context == null)
+               throw new ArgumentNullException("context");
+
             using var uof = _uofFactory();
             var newSessionStateEntity = CreateNewSessionState(workflowId, uof, context);
             var sessionState = ToSessionState(newSessionStateEntity, context);
@@ -45,6 +48,9 @@ namespace Rx.Net.StateMachine.Tests
 
         public async Task<HandlingResult> StartHandle<TSource>(TSource source, string workflowId, TContext context)
         {
+            if(context == null)
+                throw new ArgumentNullException("context");
+
             using var uof = _uofFactory();
             var newSessionStateEntity = CreateNewSessionState(workflowId, uof, context);
             var sessionState = ToSessionState(newSessionStateEntity, context);
@@ -54,6 +60,9 @@ namespace Rx.Net.StateMachine.Tests
 
         public async Task<List<HandlingResult>> HandleEvent<TEvent>(TEvent @event, TContext context)
         {
+            if(@event == null)
+                throw new ArgumentNullException(nameof(@event));
+
             using var uof = _uofFactory();
             var eventType = SessionEventAwaiter.GetTypeName(@event.GetType());
 
@@ -89,7 +98,6 @@ namespace Rx.Net.StateMachine.Tests
             sessionState.Awaiters = new List<SessionEventAwaiterEntity>();
             sessionState.Counter = 0;
             sessionState.PastEvents = new List<SessionEventEntity>();
-            sessionState.Result = null;
 
             uof.Add(sessionState);
 
@@ -98,6 +106,9 @@ namespace Rx.Net.StateMachine.Tests
 
         private async Task<HandlingResult> HandleSessionStateEvent<TEvent>(TSessionState sessionStateEntity, TContext context, TEvent @event, ISessionStateUnitOfWork<TSessionState> uof)
         {
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+
             var sessionState = ToSessionState(sessionStateEntity, context);
             bool isAdded = _stateMachine.AddEvent(sessionState, @event);
             if (!isAdded && sessionState.Status != SessionStateStatus.Created)

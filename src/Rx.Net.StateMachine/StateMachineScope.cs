@@ -5,6 +5,7 @@ using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Storage;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq.Expressions;
@@ -145,9 +146,17 @@ namespace Rx.Net.StateMachine
         public string GetStateString()
         {
             using var stateStream = new MemoryStream();
+            var serializerOptions = new JsonSerializerOptions(StateMachine.SerializerOptions)
+            {
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull | JsonIgnoreCondition.WhenWritingDefault
+            };
+
             JsonSerializer.Serialize(stateStream, SessionState.ToMinimalState(), StateMachine.SerializerOptions);
 
-            return CompressionHelper.Zip(stateStream);
+            var zipped = CompressionHelper.Zip(stateStream);
+            Console.WriteLine("Initial Length: {0}, Zipped Length: {1}", stateStream.Length, zipped.Length);
+
+            return zipped;
         }
 
         private static string GetDepthName(string prefix) => $"{prefix}[depth]";

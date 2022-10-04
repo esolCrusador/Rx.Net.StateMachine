@@ -21,7 +21,7 @@ namespace Rx.Net.StateMachine.Tests
     public class BotStatefulDialogTests : IDisposable
     {
         private IDisposable _buttonClickSubscription;
-        private readonly StateMachine _stateMachine = new StateMachine();
+        private readonly StateMachine _stateMachine;
         private readonly Guid _userId = Guid.NewGuid();
         private readonly WorkflowResolver _workflowResolver;
         private readonly WorkflowManager<TestSessionStateEntity, UserContext> _workflowManager;
@@ -38,12 +38,12 @@ namespace Rx.Net.StateMachine.Tests
                 new Item { Id = Guid.NewGuid(), Name = "Task 3", Status = ItemStatus.InProgress }
             );
 
+            _stateMachine = new StateMachine(new JsonSerializerOptions());
             var workflowManagerAccessor = new WorkflowManagerAccessor<TestSessionStateEntity, UserContext>();
             _workflowResolver = new WorkflowResolver(
-                new TaskActionsWorkflowFactory(_botFake, _itemsManager, new StateMachine(), workflowManagerAccessor),
+                new TaskActionsWorkflowFactory(_botFake, _itemsManager, _stateMachine, workflowManagerAccessor),
                 new EditItemWorkflowFactory(_botFake, _itemsManager)
             );
-
             _workflowManager = new WorkflowManager<TestSessionStateEntity, UserContext>(
                 new TestSessionStateContext(),
                 new JsonSerializerOptions(),

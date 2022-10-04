@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using Xunit;
 
 namespace Rx.Net.StateMachine.Tests
@@ -11,7 +12,7 @@ namespace Rx.Net.StateMachine.Tests
     public class CompressionHelperTest
     {
         [Theory]
-        [InlineData("Hello")]
+        [InlineData("{ Result: \"qqqqqqqqqqqqwewreewrwerewrwerwerew\", Steps: {\"Step1\": 123456, \"Step2\": 4543543543, \"Prefffffixxxxx.Step5\": \"qweqweqwwtrgfbfgtytrytrytrytrrwerew\", \"Prefffffixxxxx.Step6\": \"retertretertretertre\"}, \"Items\": {\"Item1\": \"wqewqerwrwgdfbvcbfhtrytyjhmnvcxdfeqqqsdadasgfdgertretgdfgfdgfdg\", \"RRRRRR.Item2\": \"32423essfdsfgdfghfghretertergdffgnvb vb swrwerewrwe\", \"eqwdsfstehfncsaeqweqeqtfsgfdgdf4\": \"weqw12fsdgtrrgfngfnfytrhnfhtw1qweqweqdsgertertre\" }}")]
         [InlineData("World")]
         public void ShouldCompressAndDecompress(string input)
         {

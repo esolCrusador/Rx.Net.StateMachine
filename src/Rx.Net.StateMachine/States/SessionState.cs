@@ -199,8 +199,8 @@ namespace Rx.Net.StateMachine.States
         internal MinimalSessionState ToMinimalState() => new MinimalSessionState
         {
             WorkflowId = WorkflowId,
-            Steps = _steps,
-            Items = _items,
+            Steps = _steps.Count == 0 ? null : _steps,
+            Items = _items.Count == 0 ? null : _items,
             Counter = Counter
         };
 
