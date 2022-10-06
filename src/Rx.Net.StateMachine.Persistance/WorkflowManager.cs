@@ -1,9 +1,7 @@
 ﻿using Rx.Net.StateMachine.Extensions;
-using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Persistance.Entities;
 using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Storage;
-using Rx.Net.StateMachine.Tests.Persistence;
 using Rx.Net.StateMachine.WorkflowFactories;
 using System;
 using System.Collections.Generic;
@@ -14,32 +12,37 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace Rx.Net.StateMachine.Tests
+namespace Rx.Net.StateMachine.Persistance
 {
     public class WorkflowManager<TSessionState, TContext>
         where TSessionState : SessionStateBaseEntity
     {
-        private readonly ISessionStateContext<TSessionState, TContext> _sessionStateContext;
+        private readonly ISessionStateContextConnector<TSessionState, TContext> _sessionStateContext;
         private readonly JsonSerializerOptions _options;
-        private readonly Func<ISessionStateUnitOfWork<TSessionState>> _uofFactory;
+        private readonly ISessionStateUnitOfWorkFactory<TSessionState> _uofFactory;
         private readonly IWorkflowResolver _workflowResolver;
-        private readonly StateMachine _stateMachine;
 
-        public WorkflowManager(ISessionStateContext<TSessionState, TContext> sessionStateContext, JsonSerializerOptions options, Func<ISessionStateUnitOfWork<TSessionState>> uofFactory, IWorkflowResolver workflowResolver)
+        public StateMachine StateMachine { get; }
+
+        public WorkflowManager(ISessionStateContextConnector<TSessionState, TContext> sessionStateContext, JsonSerializerOptions options, ISessionStateUnitOfWorkFactory<TSessionState> uofFactory, IWorkflowResolver workflowResolver)
+            : this(sessionStateContext, options, uofFactory, workflowResolver, new StateMachine(options))
+        { }
+
+        public WorkflowManager(ISessionStateContextConnector<TSessionState, TContext> sessionStateContext, JsonSerializerOptions options, ISessionStateUnitOfWorkFactory<TSessionState> uofFactory, IWorkflowResolver workflowResolver, StateMachine stateMachine)
         {
             _sessionStateContext = sessionStateContext;
             _options = options;
             _uofFactory = uofFactory;
             _workflowResolver = workflowResolver;
-            _stateMachine = new StateMachine(options);
+            StateMachine = stateMachine;
         }
 
         public async Task<HandlingResult> StartHandle(string workflowId, TContext context)
         {
-            if(context == null)
-               throw new ArgumentNullException("context");
+            if (context == null)
+                throw new ArgumentNullException("context");
 
-            using var uof = _uofFactory();
+            using var uof = _uofFactory.Create();
             var newSessionStateEntity = CreateNewSessionState(workflowId, uof, context);
             var sessionState = ToSessionState(newSessionStateEntity, context);
 
@@ -48,10 +51,10 @@ namespace Rx.Net.StateMachine.Tests
 
         public async Task<HandlingResult> StartHandle<TSource>(TSource source, string workflowId, TContext context)
         {
-            if(context == null)
+            if (context == null)
                 throw new ArgumentNullException("context");
 
-            using var uof = _uofFactory();
+            using var uof = _uofFactory.Create();
             var newSessionStateEntity = CreateNewSessionState(workflowId, uof, context);
             var sessionState = ToSessionState(newSessionStateEntity, context);
 
@@ -60,10 +63,10 @@ namespace Rx.Net.StateMachine.Tests
 
         public async Task<List<HandlingResult>> HandleEvent<TEvent>(TEvent @event, TContext context)
         {
-            if(@event == null)
+            if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
 
-            using var uof = _uofFactory();
+            using var uof = _uofFactory.Create();
             var eventType = SessionEventAwaiter.GetTypeName(@event.GetType());
 
             var contextFilter = _sessionStateContext.GetContextFilter(context);
@@ -110,7 +113,7 @@ namespace Rx.Net.StateMachine.Tests
                 throw new ArgumentNullException(nameof(context));
 
             var sessionState = ToSessionState(sessionStateEntity, context);
-            bool isAdded = _stateMachine.AddEvent(sessionState, @event);
+            bool isAdded = StateMachine.AddEvent(sessionState, @event);
             if (!isAdded && sessionState.Status != SessionStateStatus.Created)
                 return HandlingResult.Ignored;
 
@@ -126,7 +129,7 @@ namespace Rx.Net.StateMachine.Tests
             });
 
             var workflowFactory = await _workflowResolver.GetWorkflowFactory(sessionState.WorkflowId);
-            return await _stateMachine.HandleWorkflow(sessionState, storage, workflowFactory);
+            return await StateMachine.HandleWorkflow(sessionState, storage, workflowFactory);
         }
 
         private async Task<HandlingResult> StartHandleSessionState<TSource>(TSource source, TSessionState sessionStateEntity, SessionState sessionState, TContext context, ISessionStateUnitOfWork<TSessionState> uof)
@@ -138,7 +141,7 @@ namespace Rx.Net.StateMachine.Tests
             });
 
             var workflowFactory = await _workflowResolver.GetWorkflowFactory<TSource, Unit>(sessionState.WorkflowId);
-            return await _stateMachine.StartHandleWorkflow(source, sessionState, storage, workflowFactory);
+            return await StateMachine.StartHandleWorkflow(source, sessionState, storage, workflowFactory);
         }
 
         private static SessionState ToSessionState(TSessionState entity, object context)

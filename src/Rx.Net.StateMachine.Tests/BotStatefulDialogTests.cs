@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using Rx.Net.StateMachine.ObservableExtensions;
+using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
@@ -18,7 +19,7 @@ using Xunit;
 
 namespace Rx.Net.StateMachine.Tests
 {
-    public class BotStatefulDialogTests : IDisposable
+    public abstract class BotStatefulDialogTests : IDisposable
     {
         private IDisposable _buttonClickSubscription;
         private readonly StateMachine _stateMachine;
@@ -28,10 +29,19 @@ namespace Rx.Net.StateMachine.Tests
         private readonly BotFake _botFake;
         private readonly ItemsManager _itemsManager;
 
-        public BotStatefulDialogTests()
+        [Trait("Category", "Fast")]
+        public class FakeRepositoryTests: BotStatefulDialogTests
+        {
+            public FakeRepositoryTests()
+                :base(new TestSessionStateUnitOfWorkFactory(new SessionStateDataStore<TestSessionStateEntity>()))
+            {
+
+            }
+        }
+
+        public BotStatefulDialogTests(ISessionStateUnitOfWorkFactory<TestSessionStateEntity> sessionStateRepositoryFactory)
         {
             _botFake = new BotFake();
-            var dataStore = new SessionStateDataStore<TestSessionStateEntity>();
             _itemsManager = new ItemsManager(
                 new Item { Id = Guid.NewGuid(), Name = "Task 1", Status = ItemStatus.ToDo },
                 new Item { Id = Guid.NewGuid(), Name = "Task 2", Status = ItemStatus.ToDo },
@@ -47,8 +57,9 @@ namespace Rx.Net.StateMachine.Tests
             _workflowManager = new WorkflowManager<TestSessionStateEntity, UserContext>(
                 new TestSessionStateContext(),
                 new JsonSerializerOptions(),
-                () => new SessionStateUnitOfWork(dataStore),
-                _workflowResolver
+                sessionStateRepositoryFactory,
+                _workflowResolver,
+                _stateMachine
             );
             workflowManagerAccessor.Initialize(_workflowManager);
             _buttonClickSubscription = _botFake.ButtonClick.SelectAsync(click => HandleButtonClick(click)).Merge().Subscribe();

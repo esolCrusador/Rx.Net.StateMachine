@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Rx.Net.StateMachine.Tests.Persistence
+namespace Rx.Net.StateMachine.Persistance
 {
     public class WorkflowManagerAccessor<TSessionState, TContext>
         where TSessionState : SessionStateBaseEntity

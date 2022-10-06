@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Rx.Net.StateMachine.Tests.Persistence
 {
-    public class TestSessionStateContext : ISessionStateContext<TestSessionStateEntity, UserContext>
+    public class TestSessionStateContext : ISessionStateContextConnector<TestSessionStateEntity, UserContext>
     {
         public TestSessionStateEntity CreateNewSessionState(UserContext context)
         {

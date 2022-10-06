@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using Rx.Net.StateMachine.ObservableExtensions;
+using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
@@ -27,9 +28,8 @@ namespace Rx.Net.StateMachine.Tests
         public string LastName { get; set; }
         public DateTime BirthDate { get; set; }
     }
-    public class BotRegistrationTests : IDisposable
+    public abstract class BotRegistrationTests : IDisposable
     {
-        private readonly SessionStateDataStore<TestSessionStateEntity> _dataStore;
         private readonly WorkflowResolver _workflowResolver;
         private readonly WorkflowManager<TestSessionStateEntity, UserContext> _workflowManager;
         private readonly IDisposable _messagesHandling;
@@ -37,16 +37,25 @@ namespace Rx.Net.StateMachine.Tests
 
         private BehaviorSubject<ConcurrentDictionary<Guid, HashSet<int>>> _handledMessages = new BehaviorSubject<ConcurrentDictionary<Guid, HashSet<int>>>(new ConcurrentDictionary<Guid, HashSet<int>>());
 
-        public BotRegistrationTests()
+        [Trait("Category", "Fast")]
+        public class FakeRepositoryTests : BotRegistrationTests
+        {
+            public FakeRepositoryTests()
+                : base(new TestSessionStateUnitOfWorkFactory(new SessionStateDataStore<TestSessionStateEntity>()))
+            {
+
+            }
+        }
+
+        public BotRegistrationTests(ISessionStateUnitOfWorkFactory<TestSessionStateEntity> repositoryFactory)
         {
             _botFake = new BotFake();
-            _dataStore = new SessionStateDataStore<TestSessionStateEntity>();
             _workflowResolver = new WorkflowResolver(new BotRegistrationWorkflowFactory(_botFake));
 
             _workflowManager = new WorkflowManager<TestSessionStateEntity, UserContext>(
                 new TestSessionStateContext(),
                 new JsonSerializerOptions(),
-                () => new SessionStateUnitOfWork(_dataStore),
+                repositoryFactory,
                 _workflowResolver
             );
 

@@ -9,7 +9,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Rx.Net.StateMachine", "Rx.N
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Rx.Net.StateMachine.EntityFramework", "Rx.Net.StateMachine.EntityFramework\Rx.Net.StateMachine.EntityFramework.csproj", "{BC9A6FE6-A907-486B-AA95-3AD86AE738B4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rx.Net.StateMachine.Persistance", "Rx.Net.StateMachine.Persistance\Rx.Net.StateMachine.Persistance.csproj", "{486CE28A-B456-40E7-B61A-7F4472FF2B5D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Rx.Net.StateMachine.Persistance", "Rx.Net.StateMachine.Persistance\Rx.Net.StateMachine.Persistance.csproj", "{486CE28A-B456-40E7-B61A-7F4472FF2B5D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

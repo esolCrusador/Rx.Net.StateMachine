@@ -14,14 +14,29 @@ namespace Rx.Net.StateMachine.Tests
         public readonly List<TSessionState> SessionStates = new List<TSessionState>();
     }
 
-    public class SessionStateUnitOfWork : ISessionStateUnitOfWork<TestSessionStateEntity>
+    public class TestSessionStateUnitOfWorkFactory : ISessionStateUnitOfWorkFactory<TestSessionStateEntity>
+    {
+        private readonly SessionStateDataStore<TestSessionStateEntity> _dataStore;
+
+        public TestSessionStateUnitOfWorkFactory(SessionStateDataStore<TestSessionStateEntity> dataStore)
+        {
+            _dataStore = dataStore;
+        }
+
+        public ISessionStateUnitOfWork<TestSessionStateEntity> Create()
+        {
+            return new TestSessionStateUnitOfWork(_dataStore);
+        }
+    }
+
+    public class TestSessionStateUnitOfWork : ISessionStateUnitOfWork<TestSessionStateEntity>
     {
         private readonly SessionStateDataStore<TestSessionStateEntity> _dataStore;
 
         private List<TestSessionStateEntity> _added = new List<TestSessionStateEntity>();
         private HashSet<TestSessionStateEntity> _modified = new HashSet<TestSessionStateEntity>();
 
-        public SessionStateUnitOfWork(SessionStateDataStore<TestSessionStateEntity> dataStore)
+        public TestSessionStateUnitOfWork(SessionStateDataStore<TestSessionStateEntity> dataStore)
         {
             _dataStore = dataStore;
         }
