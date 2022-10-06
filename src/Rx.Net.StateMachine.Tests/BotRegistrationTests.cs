@@ -1,6 +1,8 @@
 ﻿using FluentAssertions;
 using Rx.Net.StateMachine.ObservableExtensions;
+using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.States;
+using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
 using Rx.Net.StateMachine.WorkflowFactories;
@@ -26,25 +28,34 @@ namespace Rx.Net.StateMachine.Tests
         public string LastName { get; set; }
         public DateTime BirthDate { get; set; }
     }
-    public class BotRegistrationTests : IDisposable
+    public abstract class BotRegistrationTests : IDisposable
     {
-        private readonly SessionStateDataStore _dataStore;
         private readonly WorkflowResolver _workflowResolver;
-        private readonly WorkflowManager _workflowManager;
+        private readonly WorkflowManager<TestSessionStateEntity, UserContext> _workflowManager;
         private readonly IDisposable _messagesHandling;
         private readonly BotFake _botFake;
 
         private BehaviorSubject<ConcurrentDictionary<Guid, HashSet<int>>> _handledMessages = new BehaviorSubject<ConcurrentDictionary<Guid, HashSet<int>>>(new ConcurrentDictionary<Guid, HashSet<int>>());
 
-        public BotRegistrationTests()
+        [Trait("Category", "Fast")]
+        public class FakeRepositoryTests : BotRegistrationTests
+        {
+            public FakeRepositoryTests()
+                : base(new TestSessionStateUnitOfWorkFactory(new SessionStateDataStore<TestSessionStateEntity>()))
+            {
+
+            }
+        }
+
+        public BotRegistrationTests(ISessionStateUnitOfWorkFactory<TestSessionStateEntity> repositoryFactory)
         {
             _botFake = new BotFake();
-            _dataStore = new SessionStateDataStore();
             _workflowResolver = new WorkflowResolver(new BotRegistrationWorkflowFactory(_botFake));
 
-            _workflowManager = new WorkflowManager(
+            _workflowManager = new WorkflowManager<TestSessionStateEntity, UserContext>(
+                new TestSessionStateContext(),
                 new JsonSerializerOptions(),
-                () => new SessionStateUnitOfWork(_dataStore),
+                repositoryFactory,
                 _workflowResolver
             );
 
@@ -86,6 +97,11 @@ namespace Rx.Net.StateMachine.Tests
             lastMessage.Should().Contain("Boris");
             lastMessage.Should().Contain("Sotsky");
             lastMessage.Should().Contain("1987");
+
+            var allMessages = _botFake.ReadAllMessageTexts(boris);
+            allMessages.Count.Should().Be(2);
+            allMessages.First().Should().Be("/Start");
+            allMessages.Last().Should().ContainAll("You was successfuly registered", "Boris", "Sotsky", "1987");
         }
 
         [Fact]
@@ -112,6 +128,12 @@ namespace Rx.Net.StateMachine.Tests
             await WaitUntilHandled(boris, messageId);
             botMessages = _botFake.ReadNewBotMessageTexts(boris);
             botMessages.Should().BeEquivalentTo("Please enter your last name");
+
+            var allMessages = _botFake.ReadAllMessageTexts(boris);
+            allMessages.Count.Should().Be(3);
+            allMessages.First().Should().Be("/Start");
+            allMessages.Skip(1).First().Should().Contain("Hello");
+            allMessages.Last().Should().Be("Please enter your last name");
         }
 
         private async Task HandleUserMessage(BotFrameworkMessage message)
@@ -155,6 +177,7 @@ namespace Rx.Net.StateMachine.Tests
             {
                 var ctx = scope.GetContext<UserContext>();
                 return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.UserId, "Hello, please follow steps to pass registration process"))
+                    .PersistMessageId(scope)
                     .Select(_ => new UserModel { Id = ctx.UserId })
                     .Persist(scope, "UserId")
                     .SelectAsync(async user => GetFirstName(await scope.BeginRecursiveScope("FirstName")).Select(firstName =>
@@ -186,15 +209,18 @@ namespace Rx.Net.StateMachine.Tests
 
                         return user;
                     })
-                    .Concat();
+                    .Concat()
+                    .DeleteMssages(scope, _botFake);
             }
 
             private IObservable<string> RequestStringInput(StateMachineScope scope, string displayName, string stateName, Func<string, ValidationResult> validate)
             {
                 var ctx = scope.GetContext<UserContext>();
                 return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.UserId, $"Please enter your {displayName}"))
+                    .PersistMessageId(scope)
                     .Persist(scope, $"Ask{stateName}")
                     .StopAndWait().For<BotFrameworkMessage>(scope, "MessageReceived")
+                    .PersistMessageId(scope)
                     .Select(message =>
                     {
                         string text = message.Text;
@@ -203,11 +229,13 @@ namespace Rx.Net.StateMachine.Tests
                             return StateMachineObservableExtensions.Of(message.Text);
 
                         return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.UserId, validationResult.ErrorMessage))
+                                    .PersistMessageId(scope)
                                     .Persist(scope, $"Invalid{stateName}")
                                     .IncreaseRecoursionDepth(scope)
                                     .Select(_ => GetFirstName(scope))
                                     .Concat();
-                    }).Concat();
+                    }).Concat()
+                    .DeleteMssages(scope, _botFake);
             }
 
             private IObservable<string> GetFirstName(StateMachineScope scope)

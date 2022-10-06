@@ -32,6 +32,11 @@ namespace Rx.Net.StateMachine.Tests.Fakes
             return ReadNewBotMessages(userId).Select(m => m.Text).ToList();
         }
 
+        public IReadOnlyCollection<string> ReadAllMessageTexts(Guid userId)
+        {
+            return GetUserMessages(userId).Select(m => m.Text).ToList();
+        }
+
         public IReadOnlyCollection<BotFrameworkMessage> ReadNewBotMessages(Guid userId)
         {
             var lastReadMessageId = _lastReadMessageIds.GetOrAdd(userId, 0);
@@ -103,7 +108,7 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         public Task<int> SendUserMessage(Guid userId, string messageText)
         {
             var messages = GetUserMessages(userId);
-            int messageId = messages.LastOrDefault()?.MessageId ?? 0 + 1;
+            int messageId = GetNextBotMessageId(userId);
             var message = new BotFrameworkMessage(messageId, userId, MessageSource.User, messageText);
             messages.Add(message);
             _userMessagesSubject.OnNext(message);
@@ -121,8 +126,6 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         {
             var messages = GetUserMessages(userId);
             messages.RemoveAt(messages.FindIndex(m => m.MessageId == messageId));
-            if (_lastReadMessageIds.TryGetValue(userId, out int messageCounter))
-                _lastReadMessageIds[userId] = messageCounter - 1;
 
             return Task.CompletedTask;
         }
@@ -154,23 +157,28 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         private List<BotFrameworkMessage> GetUserMessages(Guid userId) =>
             _messages.GetOrAdd(userId, new List<BotFrameworkMessage>());
 
-        public override string ToString()
+        public string MessagesLog
         {
-            var chats = _messages.Select(m =>
+            get
             {
-                var chatMessages = m.Value.Select(m =>
+                var chats = _messages.Select(m =>
                 {
-                    string message = $"[{m.MessageId}] {(m.Source == MessageSource.User ? "User" : "Bot")}: {m.Text}";
-                    if (m.Buttons != null && m.Buttons.Count > 0)
-                        message += $"\r\n{string.Join(", ", m.Buttons.Select(b => $"[{b.Key}]"))}";
+                    var chatMessages = m.Value.Select(m =>
+                    {
+                        string message = $"[{m.MessageId}] {(m.Source == MessageSource.User ? "User" : "Bot")}: {m.Text}";
+                        if (m.Buttons != null && m.Buttons.Count > 0)
+                            message += $"\r\n{string.Join(", ", m.Buttons.Select(b => $"[{b.Key}]"))}";
 
-                    return message;
+                        return message;
+                    });
+
+                    return $"{m.Key}:\r\n{string.Join("\r\n", chatMessages)}";
                 });
 
-                return $"{m.Key}:\r\n{string.Join("\r\n", chatMessages)}";
-            });
-
-            return string.Join(";\r\n", chats);
+                return string.Join(";\r\n", chats);
+            }
         }
+
+        public override string ToString() => MessagesLog;
     }
 }

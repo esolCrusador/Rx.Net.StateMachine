@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using Rx.Net.StateMachine.ObservableExtensions;
+using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
@@ -18,36 +19,47 @@ using Xunit;
 
 namespace Rx.Net.StateMachine.Tests
 {
-    public class BotStatefulDialogTests : IDisposable
+    public abstract class BotStatefulDialogTests : IDisposable
     {
         private IDisposable _buttonClickSubscription;
-        private readonly StateMachine _stateMachine = new StateMachine();
+        private readonly StateMachine _stateMachine;
         private readonly Guid _userId = Guid.NewGuid();
         private readonly WorkflowResolver _workflowResolver;
-        private readonly WorkflowManager _workflowManager;
+        private readonly WorkflowManager<TestSessionStateEntity, UserContext> _workflowManager;
         private readonly BotFake _botFake;
         private readonly ItemsManager _itemsManager;
 
-        public BotStatefulDialogTests()
+        [Trait("Category", "Fast")]
+        public class FakeRepositoryTests: BotStatefulDialogTests
+        {
+            public FakeRepositoryTests()
+                :base(new TestSessionStateUnitOfWorkFactory(new SessionStateDataStore<TestSessionStateEntity>()))
+            {
+
+            }
+        }
+
+        public BotStatefulDialogTests(ISessionStateUnitOfWorkFactory<TestSessionStateEntity> sessionStateRepositoryFactory)
         {
             _botFake = new BotFake();
-            var dataStore = new SessionStateDataStore();
             _itemsManager = new ItemsManager(
                 new Item { Id = Guid.NewGuid(), Name = "Task 1", Status = ItemStatus.ToDo },
                 new Item { Id = Guid.NewGuid(), Name = "Task 2", Status = ItemStatus.ToDo },
                 new Item { Id = Guid.NewGuid(), Name = "Task 3", Status = ItemStatus.InProgress }
             );
 
-            var workflowManagerAccessor = new WorkflowManagerAccessor();
+            _stateMachine = new StateMachine(new JsonSerializerOptions());
+            var workflowManagerAccessor = new WorkflowManagerAccessor<TestSessionStateEntity, UserContext>();
             _workflowResolver = new WorkflowResolver(
-                new TaskActionsWorkflowFactory(_botFake, _itemsManager, new StateMachine(), workflowManagerAccessor),
+                new TaskActionsWorkflowFactory(_botFake, _itemsManager, _stateMachine, workflowManagerAccessor),
                 new EditItemWorkflowFactory(_botFake, _itemsManager)
             );
-
-            _workflowManager = new WorkflowManager(
+            _workflowManager = new WorkflowManager<TestSessionStateEntity, UserContext>(
+                new TestSessionStateContext(),
                 new JsonSerializerOptions(),
-                () => new SessionStateUnitOfWork(dataStore),
-                _workflowResolver
+                sessionStateRepositoryFactory,
+                _workflowResolver,
+                _stateMachine
             );
             workflowManagerAccessor.Initialize(_workflowManager);
             _buttonClickSubscription = _botFake.ButtonClick.SelectAsync(click => HandleButtonClick(click)).Merge().Subscribe();
@@ -152,9 +164,9 @@ namespace Rx.Net.StateMachine.Tests
             private readonly BotFake _botFake;
             private readonly ItemsManager _itemsManager;
             private readonly StateMachine _stateMachine;
-            private readonly WorkflowManagerAccessor _workflowManagerAccessor;
+            private readonly WorkflowManagerAccessor<TestSessionStateEntity, UserContext> _workflowManagerAccessor;
 
-            public TaskActionsWorkflowFactory(BotFake botFake, ItemsManager itemsManager, StateMachine stateMachine, WorkflowManagerAccessor workflowManagerAccessor)
+            public TaskActionsWorkflowFactory(BotFake botFake, ItemsManager itemsManager, StateMachine stateMachine, WorkflowManagerAccessor<TestSessionStateEntity, UserContext> workflowManagerAccessor)
             {
                 _botFake = botFake;
                 _itemsManager = itemsManager;
@@ -256,6 +268,11 @@ namespace Rx.Net.StateMachine.Tests
                     .Select(messageId =>
                         scope.StopAndWait<BotFrameworkButtonClick>("ChangeNameConfirmationWait")
                         .Select(click => click.SelectedValue == "yes")
+                        .FinallyAsync(async (isExecuted, _, ex) =>
+                        {
+                            if (isExecuted)
+                                await _botFake.DeleteBotMessage(context.UserId, messageId);
+                        })
                     ).Concat()
                     .Select(changeName =>
                     {
@@ -295,13 +312,7 @@ namespace Rx.Net.StateMachine.Tests
                                             .Select(_ => Unit.Default);
                                     })
                                     .Concat()
-                                    .SelectAsync(async _ =>
-                                    {
-                                        var messages = scope.GetMessageIds();
-                                        await Task.WhenAll(messages.Select(messageId => _botFake.DeleteBotMessage(context.UserId, messageId)));
-                                        await scope.DeleteMessageIds();
-                                    })
-                                    .Concat()
+                                    .DeleteMssages(scope, _botFake)
                                 ).Concat();
                     }).Concat();
             }

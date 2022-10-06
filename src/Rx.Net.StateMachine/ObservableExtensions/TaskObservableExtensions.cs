@@ -42,5 +42,25 @@ namespace Rx.Net.StateMachine.ObservableExtensions
                 return source;
             }).Concat();
         }
+
+        public delegate Task FinallyDelegate<TSource>(bool isExecuted, TSource source, Exception ex);
+
+        public static IObservable<TSource> FinallyAsync<TSource>(this IObservable<TSource> sourceObservable, FinallyDelegate<TSource> handle)
+        {
+            return Observable.Create<TSource>(observer =>
+            {
+                bool isExecuted = false;
+                TSource lastSource = default;
+                return sourceObservable.Subscribe(
+                    source => {
+                        lastSource = source;
+                        isExecuted = true;
+                        observer.OnNext(source);
+                    },
+                    ex => handle(true, lastSource, ex).ContinueWith(_ => observer.OnError(ex)),
+                    () => handle(isExecuted, lastSource, null).ContinueWith(_ => observer.OnCompleted())
+                );
+            });
+        }
     }
 }

@@ -16,7 +16,12 @@ namespace Rx.Net.StateMachine
 {
     public class StateMachine
     {
-        public JsonSerializerOptions SerializerOptions { get; set; }
+        public JsonSerializerOptions SerializerOptions { get; }
+
+        public StateMachine(JsonSerializerOptions serializerOptions)
+        {
+            SerializerOptions = serializerOptions;
+        }
 
         public bool AddEvent<TEvent>(SessionState sessionState, TEvent @event)
         {
@@ -72,7 +77,15 @@ namespace Rx.Net.StateMachine
             using var stateStream = CompressionHelper.Unzip(stateString);
             var minimalSessionState = JsonSerializer.Deserialize<MinimalSessionState>(stateStream, SerializerOptions);
 
-            return new SessionState(minimalSessionState.WorkflowId, context, minimalSessionState.Counter, minimalSessionState.Steps, minimalSessionState.Items, new List<PastSessionEvent>(), new List<SessionEventAwaiter>());
+            return new SessionState(
+                minimalSessionState.WorkflowId, 
+                context, 
+                minimalSessionState.Counter, 
+                minimalSessionState.Steps ?? new Dictionary<string, SessionStateStep>(), 
+                minimalSessionState.Items ?? new Dictionary<string, string>(), 
+                new List<PastSessionEvent>(), 
+                new List<SessionEventAwaiter>()
+            );
         }
 
         private async Task<HandlingResult> HandleWorkflowResult<TResult>(IObservable<TResult> workflow, SessionState sessionState, ISessionStateStorage storage)
