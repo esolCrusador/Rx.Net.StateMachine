@@ -6,6 +6,7 @@ namespace Rx.Net.StateMachine.Persistance.Entities
 {
     public abstract class SessionStateBaseEntity
     {
+        public object SessionStateId { get; set; }
         public string WorkflowId { get; set; }
         public int Counter { get; set; }
         public List<SessionStepEntity> Steps { get; set; }
