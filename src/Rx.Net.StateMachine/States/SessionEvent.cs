@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Text.Json;
-
-namespace Rx.Net.StateMachine.States
+﻿namespace Rx.Net.StateMachine.States
 {
     public class SessionEvent
     {

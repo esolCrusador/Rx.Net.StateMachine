@@ -1,8 +1,6 @@
 ﻿using Rx.Net.StateMachine.Persistance;
 using System;
-using System.Collections.Generic;
 using System.Linq.Expressions;
-using System.Text;
 
 namespace Rx.Net.StateMachine.Tests.Persistence
 {

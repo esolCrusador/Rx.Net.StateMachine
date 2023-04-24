@@ -1,7 +1,5 @@
 ﻿using Rx.Net.StateMachine.Persistance.Entities;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Rx.Net.StateMachine.Tests
 {

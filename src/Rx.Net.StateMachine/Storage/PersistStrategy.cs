@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Rx.Net.StateMachine.Storage
 {
@@ -13,6 +11,6 @@ namespace Rx.Net.StateMachine.Storage
         PersistEachAwaiter = 2,
         PersistEachEvent = 4,
         PersistEachItem = 8,
-        PersistEachTime = PersistFinally | PersistEachState | PersistEachAwaiter | PersistEachEvent | PersistStrategy.PersistEachItem
+        PersistEachTime = PersistFinally | PersistEachState | PersistEachAwaiter | PersistEachEvent | PersistEachItem
     }
 }
