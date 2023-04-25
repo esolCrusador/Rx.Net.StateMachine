@@ -1,11 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
+using System.ComponentModel.DataAnnotations;
 
 namespace Rx.Net.StateMachine.Tests.Persistence
 {
     public class UserContext
     {
-        public Guid UserId { get; set; }
+        [Key] public Guid UserId { get; set; }
     }
 }

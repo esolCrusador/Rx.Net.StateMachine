@@ -4,8 +4,9 @@ using System.Collections.Generic;
 
 namespace Rx.Net.StateMachine.Persistance.Entities
 {
-    public abstract class SessionStateBaseEntity
+    public sealed class SessionStateEntity
     {
+        public Guid SessionStateId { get; set; }
         public string WorkflowId { get; set; }
         public int Counter { get; set; }
         public List<SessionStepEntity> Steps { get; set; }
@@ -13,6 +14,7 @@ namespace Rx.Net.StateMachine.Persistance.Entities
         public List<SessionEventEntity> PastEvents { get; set; }
         public List<SessionEventAwaiterEntity> Awaiters { get; set; }
         public SessionStateStatus Status { get; set; }
-        public string Result { get; set; }
+        public object Context { get; set; }
+        public string? Result { get; set; }
     }
 }

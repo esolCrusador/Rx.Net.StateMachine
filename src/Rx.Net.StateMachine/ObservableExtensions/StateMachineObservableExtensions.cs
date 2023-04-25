@@ -1,12 +1,7 @@
-﻿using Rx.Net.StateMachine.ObservableExtensions;
-using Rx.Net.StateMachine.States;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.ObservableExtensions

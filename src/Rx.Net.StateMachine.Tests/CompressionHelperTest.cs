@@ -1,10 +1,7 @@
 ﻿using FluentAssertions;
 using Rx.Net.StateMachine.Helpers;
-using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using System.Text.Json;
 using Xunit;
 
 namespace Rx.Net.StateMachine.Tests

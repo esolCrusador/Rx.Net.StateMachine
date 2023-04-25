@@ -1,7 +1,8 @@
 ﻿using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Persistance;
-using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
@@ -11,7 +12,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
-using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Reactive.Threading.Tasks;
@@ -28,42 +28,79 @@ namespace Rx.Net.StateMachine.Tests
         public string LastName { get; set; }
         public DateTime BirthDate { get; set; }
     }
-    public abstract class BotRegistrationTests : IDisposable
+    public abstract class BotRegistrationTests : IAsyncLifetime
     {
         private readonly WorkflowResolver _workflowResolver;
-        private readonly WorkflowManager<TestSessionStateEntity, UserContext> _workflowManager;
+        private readonly WorkflowManager<UserContext> _workflowManager;
         private readonly IDisposable _messagesHandling;
         private readonly BotFake _botFake;
-
+        private readonly Func<SessionStateDbContext<UserContext, Guid>> _createContext;
         private BehaviorSubject<ConcurrentDictionary<Guid, HashSet<int>>> _handledMessages = new BehaviorSubject<ConcurrentDictionary<Guid, HashSet<int>>>(new ConcurrentDictionary<Guid, HashSet<int>>());
 
-        [Trait("Category", "Fast")]
-        public class FakeRepositoryTests : BotRegistrationTests
-        {
-            public FakeRepositoryTests()
-                : base(new TestSessionStateUnitOfWorkFactory(new SessionStateDataStore<TestSessionStateEntity>()))
-            {
-
-            }
-        }
-
-        public BotRegistrationTests(ISessionStateUnitOfWorkFactory<TestSessionStateEntity> repositoryFactory)
+        private BotRegistrationTests(Func<SessionStateDbContext<UserContext, Guid>> createContext, ISessionStateUnitOfWorkFactory repositoryFactory)
         {
             _botFake = new BotFake();
             _workflowResolver = new WorkflowResolver(new BotRegistrationWorkflowFactory(_botFake));
 
-            _workflowManager = new WorkflowManager<TestSessionStateEntity, UserContext>(
-                new TestSessionStateContext(),
+            _workflowManager = new WorkflowManager<UserContext>(
                 new JsonSerializerOptions(),
                 repositoryFactory,
                 _workflowResolver
             );
 
             _messagesHandling = _botFake.UserMessages.SelectAsync(m => HandleUserMessage(m)).Merge().Subscribe();
+            _createContext = createContext;
         }
 
-        public void Dispose()
+        [Trait("Category", "Fast")]
+        public class Fast : BotRegistrationTests
         {
+            public Fast() : this($"TestDatabase-{Guid.NewGuid()}")
+            {
+            }
+
+            private Fast(string databaseName) :
+                this(() => new TestSessionStateDbContext(new DbContextOptionsBuilder().UseInMemoryDatabase(databaseName).Options))
+            {
+            }
+            private Fast(Func<TestSessionStateDbContext> createContext)
+                : base(createContext, new EFSessionStateUnitOfWorkFactory<UserContext, Guid, TestEFSessionStateUnitOfWork>(createContext))
+            {
+            }
+        }
+
+        [Trait("Category", "Slow")]
+        public class Slow : BotRegistrationTests
+        {
+            public Slow() : this($"TestDatabase-{Guid.NewGuid()}")
+            {
+
+            }
+
+            private Slow(string databaseName) :
+                this(() => new TestSessionStateDbContext(new DbContextOptionsBuilder()
+                    .UseSqlServer("Data Source =.; Integrated Security = True; TrustServerCertificate=True; Initial Catalog=TestDatabase;".Replace("TestDatabase", databaseName))
+                    .Options))
+            {
+
+            }
+            private Slow(Func<TestSessionStateDbContext> createContext)
+                : base(createContext, new EFSessionStateUnitOfWorkFactory<UserContext, Guid, TestEFSessionStateUnitOfWork>(createContext))
+            {
+            }
+        }
+
+        public async Task InitializeAsync()
+        {
+            await using var context = _createContext();
+            await context.Database.EnsureCreatedAsync();
+        }
+
+        public async Task DisposeAsync()
+        {
+            await using var context = _createContext();
+            await context.Database.EnsureDeletedAsync();
+
             _handledMessages.OnCompleted();
             _handledMessages.Dispose();
             _messagesHandling.Dispose();
@@ -143,7 +180,7 @@ namespace Rx.Net.StateMachine.Tests
             if (string.Equals(message.Text, "/start", StringComparison.OrdinalIgnoreCase))
                 await _workflowManager.StartHandle(BotRegistrationWorkflowFactory.Id, userContext);
             else
-                await _workflowManager.HandleEvent(message, userContext);
+                await _workflowManager.HandleEvent(message);
 
             var handledMessages = _handledMessages.Value;
             handledMessages.AddOrUpdate(message.UserId, _ => new HashSet<int> { message.MessageId }, (_, hs) =>
