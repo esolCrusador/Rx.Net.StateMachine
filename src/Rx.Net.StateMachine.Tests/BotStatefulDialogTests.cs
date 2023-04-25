@@ -1,4 +1,6 @@
 ﻿using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Rx.Net.StateMachine.EntityFramework.Tests.ContextDfinition;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Tests.Extensions;
@@ -17,7 +19,7 @@ using Xunit;
 
 namespace Rx.Net.StateMachine.Tests
 {
-    public abstract class BotStatefulDialogTests : IDisposable
+    public abstract class BotStatefulDialogTests : IAsyncLifetime
     {
         private IDisposable _buttonClickSubscription;
         private readonly StateMachine _stateMachine;
@@ -26,18 +28,9 @@ namespace Rx.Net.StateMachine.Tests
         private readonly WorkflowManager<UserContext> _workflowManager;
         private readonly BotFake _botFake;
         private readonly ItemsManager _itemsManager;
+        private readonly Func<SessionStateDbContext<UserContext, Guid>> _createContext;
 
-        [Trait("Category", "Fast")]
-        public class FakeRepositoryTests : BotStatefulDialogTests
-        {
-            public FakeRepositoryTests()
-                : base(new TestSessionStateUnitOfWorkFactory(new SessionStateDataStore()))
-            {
-
-            }
-        }
-
-        public BotStatefulDialogTests(ISessionStateUnitOfWorkFactory sessionStateRepositoryFactory)
+        private BotStatefulDialogTests(Func<SessionStateDbContext<UserContext, Guid>> createContext, ISessionStateUnitOfWorkFactory repositoryFactory)
         {
             _botFake = new BotFake();
             _itemsManager = new ItemsManager(
@@ -54,16 +47,64 @@ namespace Rx.Net.StateMachine.Tests
             );
             _workflowManager = new WorkflowManager<UserContext>(
                 new JsonSerializerOptions(),
-                sessionStateRepositoryFactory,
+                repositoryFactory,
                 _workflowResolver,
                 _stateMachine
             );
             workflowManagerAccessor.Initialize(_workflowManager);
             _buttonClickSubscription = _botFake.ButtonClick.SelectAsync(click => HandleButtonClick(click)).Merge().Subscribe();
+            _createContext = createContext;
         }
 
-        public void Dispose()
+        [Trait("Category", "Fast")]
+        public class Fast : BotStatefulDialogTests
         {
+            public Fast() : this($"TestDatabase-{Guid.NewGuid()}")
+            {
+            }
+
+            private Fast(string databaseName) :
+                this(() => new TestSessionStateDbContext(new DbContextOptionsBuilder().UseInMemoryDatabase(databaseName).Options))
+            {
+            }
+            private Fast(Func<TestSessionStateDbContext> createContext)
+                : base(createContext, new EFSessionStateUnitOfWorkFactory<UserContext, Guid, TestEFSessionStateUnitOfWork>(createContext))
+            {
+            }
+        }
+
+        [Trait("Category", "Slow")]
+        public class Slow : BotStatefulDialogTests
+        {
+            public Slow() : this($"TestDatabase-{Guid.NewGuid()}")
+            {
+
+            }
+
+            private Slow(string databaseName) :
+                this(() => new TestSessionStateDbContext(new DbContextOptionsBuilder()
+                    .UseSqlServer("Data Source =.; Integrated Security = True; TrustServerCertificate=True; Initial Catalog=TestDatabase;".Replace("TestDatabase", databaseName))
+                    .Options))
+            {
+
+            }
+            private Slow(Func<TestSessionStateDbContext> createContext)
+                : base(createContext, new EFSessionStateUnitOfWorkFactory<UserContext, Guid, TestEFSessionStateUnitOfWork>(createContext))
+            {
+            }
+        }
+
+        public async Task InitializeAsync()
+        {
+            await using var context = _createContext();
+            await context.Database.EnsureCreatedAsync();
+        }
+
+        public async Task DisposeAsync()
+        {
+            await using var context = _createContext();
+            await context.Database.EnsureDeletedAsync();
+
             _buttonClickSubscription.Dispose();
         }
 
