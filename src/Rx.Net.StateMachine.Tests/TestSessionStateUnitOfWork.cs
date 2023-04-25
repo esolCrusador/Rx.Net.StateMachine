@@ -1,4 +1,6 @@
 ﻿using Rx.Net.StateMachine.Persistance;
+using Rx.Net.StateMachine.Persistance.Entities;
+using Rx.Net.StateMachine.Tests.Fakes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,41 +10,41 @@ using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.Tests
 {
-    public class SessionStateDataStore<TSessionState>
+    public class SessionStateDataStore
     {
-        public readonly List<TSessionState> SessionStates = new List<TSessionState>();
+        public readonly List<SessionStateEntity> SessionStates = new List<SessionStateEntity>();
     }
 
-    public class TestSessionStateUnitOfWorkFactory : ISessionStateUnitOfWorkFactory<TestSessionStateEntity>
+    public class TestSessionStateUnitOfWorkFactory : ISessionStateUnitOfWorkFactory
     {
-        private readonly SessionStateDataStore<TestSessionStateEntity> _dataStore;
+        private readonly SessionStateDataStore _dataStore;
 
-        public TestSessionStateUnitOfWorkFactory(SessionStateDataStore<TestSessionStateEntity> dataStore)
+        public TestSessionStateUnitOfWorkFactory(SessionStateDataStore dataStore)
         {
             _dataStore = dataStore;
         }
 
-        public ISessionStateUnitOfWork<TestSessionStateEntity> Create()
+        public ISessionStateUnitOfWork Create()
         {
             return new TestSessionStateUnitOfWork(_dataStore);
         }
     }
 
-    public class TestSessionStateUnitOfWork : ISessionStateUnitOfWork<TestSessionStateEntity>
+    public class TestSessionStateUnitOfWork : ISessionStateUnitOfWork
     {
-        private readonly SessionStateDataStore<TestSessionStateEntity> _dataStore;
+        private readonly SessionStateDataStore _dataStore;
 
-        private List<TestSessionStateEntity> _added = new List<TestSessionStateEntity>();
-        private HashSet<TestSessionStateEntity> _modified = new HashSet<TestSessionStateEntity>();
+        private List<SessionStateEntity> _added = new List<SessionStateEntity>();
+        private HashSet<SessionStateEntity> _modified = new HashSet<SessionStateEntity>();
 
-        public TestSessionStateUnitOfWork(SessionStateDataStore<TestSessionStateEntity> dataStore)
+        public TestSessionStateUnitOfWork(SessionStateDataStore dataStore)
         {
             _dataStore = dataStore;
         }
 
-        public Task<IReadOnlyCollection<TestSessionStateEntity>> GetSessionStates(Expression<Func<TestSessionStateEntity, bool>> filter)
+        public Task<IReadOnlyCollection<SessionStateEntity>> GetSessionStates(object @event)
         {
-            var sessionStates = _dataStore.SessionStates.AsQueryable().Where(filter)
+            var sessionStates = _dataStore.SessionStates.AsQueryable().Where(GetFilter(@event))
                 .AsEnumerable()
                 .Select(s =>
                 {
@@ -51,9 +53,18 @@ namespace Rx.Net.StateMachine.Tests
                 })
                 .ToList();
 
-            return Task.FromResult<IReadOnlyCollection<TestSessionStateEntity>>(sessionStates);
+            return Task.FromResult<IReadOnlyCollection<SessionStateEntity>>(sessionStates);
         }
-        public Task Add(TestSessionStateEntity entity)
+        private Expression<Func<SessionStateEntity, bool>> GetFilter(object @event)
+        {
+            if (@event is BotFrameworkMessage botFrameworkMessage)
+                return ss => true; // TODO Replace with filter
+            if (@event is BotFrameworkButtonClick botFrameworkButtonClick)
+                return bf => true;
+
+            throw new NotSupportedException($"Not supported event type {@event}");
+        }
+        public Task Add(SessionStateEntity entity)
         {
             _added.Add(entity);
 
@@ -80,13 +91,25 @@ namespace Rx.Net.StateMachine.Tests
             return Task.CompletedTask;
         }
 
-        private static TestSessionStateEntity DeepClone(TestSessionStateEntity sessionState) =>
-            JsonSerializer.Deserialize<TestSessionStateEntity>(JsonSerializer.Serialize(sessionState));
+        private static SessionStateEntity DeepClone(SessionStateEntity sessionState)
+        {
+            var result = JsonSerializer.Deserialize<SessionStateEntity>(JsonSerializer.Serialize(sessionState));
+            result.Context = sessionState.Context;
+
+            return result;
+        }
 
         public void Dispose()
         {
             _modified.Clear();
             _added.Clear();
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            _modified.Clear();
+            _added.Clear();
+            return default;
         }
     }
 }

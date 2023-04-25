@@ -1,16 +1,14 @@
 ﻿using Rx.Net.StateMachine.Persistance.Entities;
 using System;
 using System.Collections.Generic;
-using System.Linq.Expressions;
 using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.Persistance
 {
-    public interface ISessionStateUnitOfWork<TSessionState> : IDisposable
-        where TSessionState : SessionStateBaseEntity
+    public interface ISessionStateUnitOfWork : IDisposable, IAsyncDisposable
     {
-        Task<IReadOnlyCollection<TSessionState>> GetSessionStates(Expression<Func<TSessionState, bool>> filter);
-        Task Add(TSessionState sessionState);
+        Task<IReadOnlyCollection<SessionStateEntity>> GetSessionStates(object @event);
+        Task Add(SessionStateEntity sessionState);
         Task Save();
     }
 }

@@ -1,6 +1,8 @@
 ﻿using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Persistance;
+using Rx.Net.StateMachine.Persistance.Entities;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
@@ -29,7 +31,7 @@ namespace Rx.Net.StateMachine.Tests
     public abstract class BotRegistrationTests : IDisposable
     {
         private readonly WorkflowResolver _workflowResolver;
-        private readonly WorkflowManager<TestSessionStateEntity, UserContext> _workflowManager;
+        private readonly WorkflowManager<UserContext> _workflowManager;
         private readonly IDisposable _messagesHandling;
         private readonly BotFake _botFake;
 
@@ -39,19 +41,52 @@ namespace Rx.Net.StateMachine.Tests
         public class FakeRepositoryTests : BotRegistrationTests
         {
             public FakeRepositoryTests()
-                : base(new TestSessionStateUnitOfWorkFactory(new SessionStateDataStore<TestSessionStateEntity>()))
+                : base(new TestSessionStateUnitOfWorkFactory(new SessionStateDataStore()))
             {
 
             }
         }
 
-        public BotRegistrationTests(ISessionStateUnitOfWorkFactory<TestSessionStateEntity> repositoryFactory)
+        [Trait("Category", "Fast")]
+        public class InMemoryDatabaseTests : BotRegistrationTests, IAsyncLifetime
+        {
+            private readonly Func<TestSessionStateDbContext> _createContext;
+
+            public InMemoryDatabaseTests(): this($"test-{Guid.NewGuid()}")
+            {
+                
+            }
+
+            private InMemoryDatabaseTests(string databaseName) :
+                this(() => new TestSessionStateDbContext(new DbContextOptionsBuilder().UseInMemoryDatabase(databaseName).Options))
+            {
+
+            }
+            private InMemoryDatabaseTests(Func<TestSessionStateDbContext> createContext)
+                : base(new EFSessionStateUnitOfWorkFactory<UserContext, Guid, TestEFSessionStateUnitOfWork>(createContext))
+            {
+                _createContext = createContext;
+            }
+
+            public async Task DisposeAsync()
+            {
+                await using var context = _createContext();
+                await context.Database.EnsureDeletedAsync();
+            }
+
+            public async Task InitializeAsync()
+            {
+                await using var context = _createContext();
+                await context.Database.EnsureCreatedAsync();
+            }
+        }
+
+        public BotRegistrationTests(ISessionStateUnitOfWorkFactory repositoryFactory)
         {
             _botFake = new BotFake();
             _workflowResolver = new WorkflowResolver(new BotRegistrationWorkflowFactory(_botFake));
 
-            _workflowManager = new WorkflowManager<TestSessionStateEntity, UserContext>(
-                new TestSessionStateContext(),
+            _workflowManager = new WorkflowManager<UserContext>(
                 new JsonSerializerOptions(),
                 repositoryFactory,
                 _workflowResolver
@@ -141,7 +176,7 @@ namespace Rx.Net.StateMachine.Tests
             if (string.Equals(message.Text, "/start", StringComparison.OrdinalIgnoreCase))
                 await _workflowManager.StartHandle(BotRegistrationWorkflowFactory.Id, userContext);
             else
-                await _workflowManager.HandleEvent(message, userContext);
+                await _workflowManager.HandleEvent(message);
 
             var handledMessages = _handledMessages.Value;
             handledMessages.AddOrUpdate(message.UserId, _ => new HashSet<int> { message.MessageId }, (_, hs) =>

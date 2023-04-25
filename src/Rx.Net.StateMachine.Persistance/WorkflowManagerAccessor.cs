@@ -3,16 +3,15 @@ using System;
 
 namespace Rx.Net.StateMachine.Persistance
 {
-    public class WorkflowManagerAccessor<TSessionState, TContext>
-        where TSessionState : SessionStateBaseEntity
+    public class WorkflowManagerAccessor<TContext>
     {
         private bool _isInitialized;
-        public WorkflowManager<TSessionState, TContext> WorkflowManager { get; private set; }
+        public WorkflowManager<TContext>? WorkflowManager { get; private set; }
 
-        public void Initialize(WorkflowManager<TSessionState, TContext> workflowManager)
+        public void Initialize(WorkflowManager<TContext> workflowManager)
         {
             if (_isInitialized)
-                throw new InvalidOperationException($"{nameof(WorkflowManagerAccessor<TSessionState, TContext>)} is already initialized");
+                throw new InvalidOperationException($"{nameof(WorkflowManagerAccessor<TContext>)} is already initialized");
 
             _isInitialized = true;
             WorkflowManager = workflowManager;

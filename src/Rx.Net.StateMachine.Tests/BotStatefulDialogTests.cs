@@ -23,7 +23,7 @@ namespace Rx.Net.StateMachine.Tests
         private readonly StateMachine _stateMachine;
         private readonly Guid _userId = Guid.NewGuid();
         private readonly WorkflowResolver _workflowResolver;
-        private readonly WorkflowManager<TestSessionStateEntity, UserContext> _workflowManager;
+        private readonly WorkflowManager<UserContext> _workflowManager;
         private readonly BotFake _botFake;
         private readonly ItemsManager _itemsManager;
 
@@ -31,13 +31,13 @@ namespace Rx.Net.StateMachine.Tests
         public class FakeRepositoryTests: BotStatefulDialogTests
         {
             public FakeRepositoryTests()
-                :base(new TestSessionStateUnitOfWorkFactory(new SessionStateDataStore<TestSessionStateEntity>()))
+                :base(new TestSessionStateUnitOfWorkFactory(new SessionStateDataStore()))
             {
 
             }
         }
 
-        public BotStatefulDialogTests(ISessionStateUnitOfWorkFactory<TestSessionStateEntity> sessionStateRepositoryFactory)
+        public BotStatefulDialogTests(ISessionStateUnitOfWorkFactory sessionStateRepositoryFactory)
         {
             _botFake = new BotFake();
             _itemsManager = new ItemsManager(
@@ -47,13 +47,12 @@ namespace Rx.Net.StateMachine.Tests
             );
 
             _stateMachine = new StateMachine(new JsonSerializerOptions());
-            var workflowManagerAccessor = new WorkflowManagerAccessor<TestSessionStateEntity, UserContext>();
+            var workflowManagerAccessor = new WorkflowManagerAccessor<UserContext>();
             _workflowResolver = new WorkflowResolver(
                 new TaskActionsWorkflowFactory(_botFake, _itemsManager, _stateMachine, workflowManagerAccessor),
                 new EditItemWorkflowFactory(_botFake, _itemsManager)
             );
-            _workflowManager = new WorkflowManager<TestSessionStateEntity, UserContext>(
-                new TestSessionStateContext(),
+            _workflowManager = new WorkflowManager<UserContext>(
                 new JsonSerializerOptions(),
                 sessionStateRepositoryFactory,
                 _workflowResolver,
@@ -134,11 +133,6 @@ namespace Rx.Net.StateMachine.Tests
             await _stateMachine.StartHandleWorkflow(item, context, await _workflowResolver.GetWorkflowFactory<Item, Unit>(TaskActionsWorkflowFactory.Id));
         }
 
-        private async Task HandleMessage(BotFrameworkMessage message)
-        {
-            await _workflowManager.HandleEvent(message, new DialogContext { UserId = message.UserId, MessageId = message.MessageId });
-        }
-
         private async Task HandleButtonClick(BotFrameworkButtonClick buttonClick)
         {
             if (buttonClick.SelectedValue.StartsWith("s:"))
@@ -152,7 +146,7 @@ namespace Rx.Net.StateMachine.Tests
             }
             else
             {
-                await _workflowManager.HandleEvent(buttonClick, new DialogContext { UserId = buttonClick.UserId, MessageId = buttonClick.MessageId });
+                await _workflowManager.HandleEvent(buttonClick);
             }
         }
 
@@ -162,9 +156,9 @@ namespace Rx.Net.StateMachine.Tests
             private readonly BotFake _botFake;
             private readonly ItemsManager _itemsManager;
             private readonly StateMachine _stateMachine;
-            private readonly WorkflowManagerAccessor<TestSessionStateEntity, UserContext> _workflowManagerAccessor;
+            private readonly WorkflowManagerAccessor<UserContext> _workflowManagerAccessor;
 
-            public TaskActionsWorkflowFactory(BotFake botFake, ItemsManager itemsManager, StateMachine stateMachine, WorkflowManagerAccessor<TestSessionStateEntity, UserContext> workflowManagerAccessor)
+            public TaskActionsWorkflowFactory(BotFake botFake, ItemsManager itemsManager, StateMachine stateMachine, WorkflowManagerAccessor<UserContext> workflowManagerAccessor)
             {
                 _botFake = botFake;
                 _itemsManager = itemsManager;

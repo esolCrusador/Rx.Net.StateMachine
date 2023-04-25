@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Rx.Net.StateMachine.EntityFramework.Tests\Rx.Net.StateMachine.EntityFramework.Tests.csproj" />
     <ProjectReference Include="..\Rx.Net.StateMachine.Persistance\Rx.Net.StateMachine.Persistance.csproj" />
     <ProjectReference Include="..\Rx.Net.StateMachine\Rx.Net.StateMachine.csproj" />
   </ItemGroup>
