@@ -28,10 +28,10 @@ namespace Rx.Net.StateMachine.Tests
         private readonly ItemsManager _itemsManager;
 
         [Trait("Category", "Fast")]
-        public class FakeRepositoryTests: BotStatefulDialogTests
+        public class FakeRepositoryTests : BotStatefulDialogTests
         {
             public FakeRepositoryTests()
-                :base(new TestSessionStateUnitOfWorkFactory(new SessionStateDataStore()))
+                : base(new TestSessionStateUnitOfWorkFactory(new SessionStateDataStore()))
             {
 
             }
@@ -128,16 +128,18 @@ namespace Rx.Net.StateMachine.Tests
 
         private async Task ShowItem(Item item)
         {
-            var context = new DialogContext { UserId = _userId };
+            var context = new UserContext { UserId = _userId };
 
-            await _stateMachine.StartHandleWorkflow(item, context, await _workflowResolver.GetWorkflowFactory<Item, Unit>(TaskActionsWorkflowFactory.Id));
+            await _stateMachine.StartHandleWorkflow(new ItemWithMessage(item, null), context,
+                await _workflowResolver.GetWorkflowFactory<ItemWithMessage, Unit>(TaskActionsWorkflowFactory.Id)
+            );
         }
 
         private async Task HandleButtonClick(BotFrameworkButtonClick buttonClick)
         {
             if (buttonClick.SelectedValue.StartsWith("s:"))
             {
-                var context = new DialogContext { UserId = buttonClick.UserId, MessageId = buttonClick.MessageId };
+                var context = new UserContext { UserId = buttonClick.UserId };
                 var stateString = buttonClick.SelectedValue.Substring(2, buttonClick.SelectedValue.LastIndexOf('-') - 2);
                 var state = _stateMachine.ParseSessionState(context, stateString);
                 _stateMachine.ForceAddEvent(state, buttonClick);
@@ -151,7 +153,7 @@ namespace Rx.Net.StateMachine.Tests
         }
 
         // https://www.figma.com/file/JXTrJQklRBTbbGbvhI0taD/Task-Actions-Dialog?node-id=3%3A76
-        class TaskActionsWorkflowFactory : WorkflowFactory<Item, Unit>
+        class TaskActionsWorkflowFactory : WorkflowFactory<ItemWithMessage, Unit>
         {
             private readonly BotFake _botFake;
             private readonly ItemsManager _itemsManager;
@@ -169,25 +171,25 @@ namespace Rx.Net.StateMachine.Tests
             public const string Id = "task-actions";
             public override string WorkflowId => Id;
 
-            public override IObservable<Unit> GetResult(IObservable<Item> input, StateMachineScope scope)
+            public override IObservable<Unit> GetResult(IObservable<ItemWithMessage> input, StateMachineScope scope)
             {
-                var context = scope.GetContext<DialogContext>();
+                var context = scope.GetContext<UserContext>();
 
                 return input
                     .Persist(scope, "Item")
-                    .Select(item =>
+                    .Select(itemWithMessage =>
                     {
+                        var item = itemWithMessage.Item;
                         return Observable.FromAsync(() =>
                         {
                             var currentState = scope.GetStateString();
 
-                            return _botFake.AddOrUpdateBotMessage(context.UserId, context.MessageId, $"{item.Name}",
+                            return _botFake.AddOrUpdateBotMessage(context.UserId, itemWithMessage.MessageId, $"{item.Name}",
                                     new KeyValuePair<string, string>(item.Status == ItemStatus.ToDo ? "Play" : "Pause", $"s:{currentState}-{(item.Status == ItemStatus.ToDo ? "pl" : "pa")}"),
                                     new KeyValuePair<string, string>("Edit", $"s:{currentState}-e"),
                                     new KeyValuePair<string, string>("Delete", $"s:{currentState}-d")
                                 );
                         }).PersistBeforePrevious(scope, "InitialDialog")
-                        .Select(_ => context.MessageId)
                         .StopAndWait().For<BotFrameworkButtonClick>(scope, "InitialButtonClock")
                         .SelectAsync(async buttonClick =>
                         {
@@ -197,22 +199,22 @@ namespace Rx.Net.StateMachine.Tests
                                 case "pl":
                                     {
                                         var updatedItem = await _itemsManager.UpdateItem(item.Id, i => i.Status = ItemStatus.InProgress);
-                                        await UpdateItemMessage(updatedItem, new DialogContext { UserId = context.UserId, MessageId = context.MessageId }); ;
+                                        await UpdateItemMessage(new ItemWithMessage(updatedItem, buttonClick.MessageId), new UserContext { UserId = context.UserId }); ;
                                         break;
                                     }
                                 case "pa":
                                     {
                                         var updatedItem = await _itemsManager.UpdateItem(item.Id, i => i.Status = ItemStatus.ToDo);
-                                        await UpdateItemMessage(updatedItem, new DialogContext { UserId = context.UserId, MessageId = context.MessageId }); ;
+                                        await UpdateItemMessage(new ItemWithMessage(updatedItem, buttonClick.MessageId), new UserContext { UserId = context.UserId }); ;
                                         break;
                                     }
                                 case "e":
-                                    await _workflowManagerAccessor.WorkflowManager.StartHandle(item, EditItemWorkflowFactory.Id, context);
+                                    await _workflowManagerAccessor.WorkflowManager.StartHandle(new ItemWithMessage(item, buttonClick.MessageId), EditItemWorkflowFactory.Id, context);
                                     break;
                                 case "d":
                                     {
                                         await _itemsManager.DeleteItem(item.Id);
-                                        await _botFake.DeleteBotMessage(context.UserId, context.MessageId.Value);
+                                        await _botFake.DeleteBotMessage(context.UserId, buttonClick.MessageId);
                                         break;
                                     }
                                 default:
@@ -225,13 +227,13 @@ namespace Rx.Net.StateMachine.Tests
                     .Select(_ => Unit.Default);
             }
 
-            private async Task UpdateItemMessage(Item item, DialogContext dialogContext)
+            private async Task UpdateItemMessage(ItemWithMessage item, UserContext dialogContext)
             {
                 await _stateMachine.StartHandleWorkflow(item, dialogContext, this);
             }
         }
 
-        class EditItemWorkflowFactory : WorkflowFactory<Item, Unit>
+        class EditItemWorkflowFactory : WorkflowFactory<ItemWithMessage, Unit>
         {
             private readonly BotFake _botFake;
             private readonly ItemsManager _itemsManager;
@@ -245,13 +247,13 @@ namespace Rx.Net.StateMachine.Tests
             public const string Id = "edit-item";
             public override string WorkflowId => Id;
 
-            public override IObservable<Unit> GetResult(IObservable<Item> input, StateMachineScope scope)
+            public override IObservable<Unit> GetResult(IObservable<ItemWithMessage> input, StateMachineScope scope)
             {
-                var context = scope.GetContext<DialogContext>();
+                var context = scope.GetContext<UserContext>();
 
                 return input.Persist(scope, "Item").Select(item =>
                 {
-                    return Observable.FromAsync(() => _botFake.SendButtonsBotMessage(context.UserId, "Do you want to change name?", context.MessageId,
+                    return Observable.FromAsync(() => _botFake.SendButtonsBotMessage(context.UserId, "Do you want to change name?", item.MessageId,
                         new KeyValuePair<string, string>("Yes", "yes"),
                         new KeyValuePair<string, string>("No", "no")
                     ))
@@ -271,7 +273,7 @@ namespace Rx.Net.StateMachine.Tests
                         if (!changeName)
                             return StateMachineObservableExtensions.Of(Unit.Default);
 
-                        return UpdateItemName(item, scope.BeginRecursiveScope("Name"));
+                        return UpdateItemName(item.Item, scope.BeginRecursiveScope("Name"));
                     })
                     .Concat()
                     .SelectAsync(_ => scope.DeleteMessageIds())
@@ -284,7 +286,7 @@ namespace Rx.Net.StateMachine.Tests
                 return scopeTask.ToObservable()
                     .Select(scope =>
                     {
-                        var context = scope.GetContext<DialogContext>();
+                        var context = scope.GetContext<UserContext>();
 
                         return Observable.FromAsync(() =>
                             _botFake.SendBotMessage(context.UserId, "Please enter name"))
@@ -294,7 +296,7 @@ namespace Rx.Net.StateMachine.Tests
                                     .Select(nameInput =>
                                     {
                                         if (string.IsNullOrEmpty(nameInput.Text))
-                                            return Observable.FromAsync(() => _botFake.SendBotMessage(context.UserId, "Name is not valid", nameInput.MessageId))
+                                            return Observable.FromAsync(() => _botFake.SendBotMessage(context.UserId, "Name is not valid", messageId))
                                                 .PersistMessageId(scope)
                                                 .Select(_ =>
                                                         UpdateItemName(item, scope.IncreaseRecursionDepth())
@@ -332,11 +334,6 @@ namespace Rx.Net.StateMachine.Tests
             }
         }
 
-        class DialogContext : UserContext
-        {
-            public int? MessageId { get; set; }
-        }
-
         enum ItemStatus
         {
             ToDo,
@@ -349,6 +346,17 @@ namespace Rx.Net.StateMachine.Tests
             public Guid Id { get; set; }
             public string Name { get; set; }
             public ItemStatus Status { get; set; }
+        }
+
+        class ItemWithMessage
+        {
+            public Item Item { get; }
+            public int? MessageId { get; }
+            public ItemWithMessage(Item item, int? messageId)
+            {
+                Item = item;
+                MessageId = messageId;
+            }
         }
     }
 }
