@@ -52,7 +52,7 @@ namespace Rx.Net.StateMachine.Tests
         {
             private readonly Func<TestSessionStateDbContext> _createContext;
 
-            public InMemoryDatabaseTests(): this($"test-{Guid.NewGuid()}")
+            public InMemoryDatabaseTests(): this($"TestDatabase-{Guid.NewGuid()}")
             {
                 
             }
@@ -63,6 +63,42 @@ namespace Rx.Net.StateMachine.Tests
 
             }
             private InMemoryDatabaseTests(Func<TestSessionStateDbContext> createContext)
+                : base(new EFSessionStateUnitOfWorkFactory<UserContext, Guid, TestEFSessionStateUnitOfWork>(createContext))
+            {
+                _createContext = createContext;
+            }
+
+            public async Task DisposeAsync()
+            {
+                await using var context = _createContext();
+                await context.Database.EnsureDeletedAsync();
+            }
+
+            public async Task InitializeAsync()
+            {
+                await using var context = _createContext();
+                await context.Database.EnsureCreatedAsync();
+            }
+        }
+
+        [Trait("Category", "Slow")]
+        public class SlowDatabaseTests : BotRegistrationTests, IAsyncLifetime
+        {
+            private readonly Func<TestSessionStateDbContext> _createContext;
+
+            public SlowDatabaseTests() : this($"TestDatabase-{Guid.NewGuid()}")
+            {
+
+            }
+
+            private SlowDatabaseTests(string databaseName) :
+                this(() => new TestSessionStateDbContext(new DbContextOptionsBuilder()
+                    .UseSqlServer("Data Source =.; Integrated Security = True; TrustServerCertificate=True; Initial Catalog=TestDatabase;".Replace("TestDatabase", databaseName))
+                    .Options))
+            {
+
+            }
+            private SlowDatabaseTests(Func<TestSessionStateDbContext> createContext)
                 : base(new EFSessionStateUnitOfWorkFactory<UserContext, Guid, TestEFSessionStateUnitOfWork>(createContext))
             {
                 _createContext = createContext;

@@ -23,7 +23,8 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.ContextDfinition
 
                 builder.HasMany(ss => ss.Awaiters)
                     .WithOne()
-                    .HasForeignKey(ss => ss.SessionStateId);
+                    .HasForeignKey(ss => ss.SessionStateId)
+                    .OnDelete(DeleteBehavior.NoAction);
                 builder.HasOne(ss => ss.Context)
                     .WithMany()
                     .HasForeignKey(ss => ss.ContextId);
