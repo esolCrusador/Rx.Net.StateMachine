@@ -1,4 +1,4 @@
-﻿using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
+﻿using Rx.Net.StateMachine.EntityFramework.Tables;
 using Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;

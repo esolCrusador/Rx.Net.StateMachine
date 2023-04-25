@@ -1,4 +1,8 @@
-﻿namespace Rx.Net.StateMachine.EntityFramework.Tests.Extensions
+﻿using Rx.Net.StateMachine.EntityFramework.Extensions;
+using System;
+using System.Collections.Generic;
+
+namespace Rx.Net.StateMachine.EntityFramework.Extensions
 {
     public class MergeExecutor<TLeft, TRight, TKey>
     {

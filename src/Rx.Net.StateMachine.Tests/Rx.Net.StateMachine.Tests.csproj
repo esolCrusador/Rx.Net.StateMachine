@@ -6,12 +6,13 @@
 
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="6.11.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="7.0.5" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="7.0.5" />
     <PackageReference Include="xunit" Version="2.4.2" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Rx.Net.StateMachine.EntityFramework.Tests\Rx.Net.StateMachine.EntityFramework.Tests.csproj" />
+    <ProjectReference Include="..\Rx.Net.StateMachine.EntityFramework\Rx.Net.StateMachine.EntityFramework.csproj" />
     <ProjectReference Include="..\Rx.Net.StateMachine.Persistance\Rx.Net.StateMachine.Persistance.csproj" />
     <ProjectReference Include="..\Rx.Net.StateMachine\Rx.Net.StateMachine.csproj" />
   </ItemGroup>

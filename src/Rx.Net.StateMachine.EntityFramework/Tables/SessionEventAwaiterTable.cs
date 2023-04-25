@@ -1,4 +1,6 @@
-﻿namespace Rx.Net.StateMachine.EntityFramework.Tests.Tables
+﻿using System;
+
+namespace Rx.Net.StateMachine.EntityFramework.Tests.Tables
 {
     public class SessionEventAwaiterTable<TContext, TContextKey>
     {

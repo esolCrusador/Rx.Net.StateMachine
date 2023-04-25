@@ -1,11 +1,16 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Rx.Net.StateMachine.EntityFramework.Tests.ContextDfinition;
-using Rx.Net.StateMachine.EntityFramework.Tests.Extensions;
+using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
+using Rx.Net.StateMachine.EntityFramework.Extensions;
+using Rx.Net.StateMachine.EntityFramework.Tables;
 using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Persistance.Entities;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 {

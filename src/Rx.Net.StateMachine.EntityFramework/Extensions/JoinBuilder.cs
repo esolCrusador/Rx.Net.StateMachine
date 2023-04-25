@@ -1,4 +1,8 @@
-﻿namespace Rx.Net.StateMachine.EntityFramework.Tests.Extensions
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace Rx.Net.StateMachine.EntityFramework.Extensions
 {
     public struct JoinBuilder<TLeft, TRight>
     {

@@ -1,9 +1,8 @@
 ﻿using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Rx.Net.StateMachine.EntityFramework.Tests.ContextDfinition;
+using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Persistance;
-using Rx.Net.StateMachine.Persistance.Entities;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;

@@ -1,6 +1,9 @@
-﻿using Rx.Net.StateMachine.States;
+﻿using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
+using Rx.Net.StateMachine.States;
+using System;
+using System.Collections.Generic;
 
-namespace Rx.Net.StateMachine.EntityFramework.Tests.Tables
+namespace Rx.Net.StateMachine.EntityFramework.Tables
 {
     public class SessionStateTable<TContext, TContextKey>
     {

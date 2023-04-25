@@ -1,7 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Rx.Net.StateMachine.EntityFramework.Tables;
 using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
 
-namespace Rx.Net.StateMachine.EntityFramework.Tests.ContextDfinition
+namespace Rx.Net.StateMachine.EntityFramework.ContextDfinition
 {
     public abstract class SessionStateDbContext<TContext, TContextKey> : DbContext
         where TContext : class

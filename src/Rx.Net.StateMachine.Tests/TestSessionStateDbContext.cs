@@ -1,5 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Rx.Net.StateMachine.EntityFramework.Tests.ContextDfinition;
+using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.Tests.Persistence;
 using System;
 

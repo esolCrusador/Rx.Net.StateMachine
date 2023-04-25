@@ -1,7 +1,10 @@
-﻿using Rx.Net.StateMachine.EntityFramework.Tests.Extensions;
+﻿using Rx.Net.StateMachine.EntityFramework.Extensions;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 
-namespace Rx.Net.StateMachine.EntityFramework.Tests.Extensions
+namespace Rx.Net.StateMachine.EntityFramework.Extensions
 {
     public static class EnumerableExtensions
     {

@@ -1,6 +1,7 @@
-﻿using Rx.Net.StateMachine.EntityFramework.Tests.ContextDfinition;
+﻿using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork;
 using Rx.Net.StateMachine.Persistance;
+using System;
 
 public class EFSessionStateUnitOfWorkFactory<TContext, TContextKey, TUnitOfWork> : ISessionStateUnitOfWorkFactory
     where TContext: class
