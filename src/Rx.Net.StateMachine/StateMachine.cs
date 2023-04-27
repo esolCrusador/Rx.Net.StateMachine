@@ -16,6 +16,10 @@ namespace Rx.Net.StateMachine
     {
         public JsonSerializerOptions SerializerOptions { get; }
 
+        public StateMachine(): this(new JsonSerializerOptions())
+        {
+        }
+
         public StateMachine(JsonSerializerOptions serializerOptions)
         {
             SerializerOptions = serializerOptions;

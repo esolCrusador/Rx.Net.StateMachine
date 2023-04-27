@@ -1,22 +1,23 @@
 ﻿using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork;
 using Rx.Net.StateMachine.Persistance;
-using System;
 
 public class EFSessionStateUnitOfWorkFactory<TContext, TContextKey, TUnitOfWork> : ISessionStateUnitOfWorkFactory
     where TContext: class
     where TUnitOfWork: EFSessionStateUnitOfWork<TContext, TContextKey>, new()
 {
-    private readonly Func<SessionStateDbContext<TContext, TContextKey>> _createContext;
+    private readonly SessionStateDbContextFactory<TContext, TContextKey> _contextFactory;
 
-    public EFSessionStateUnitOfWorkFactory(Func<SessionStateDbContext<TContext, TContextKey>> createContext)
+    public EFSessionStateUnitOfWorkFactory(SessionStateDbContextFactory<TContext, TContextKey> contextFactory)
     {
-        _createContext = createContext;
+        _contextFactory = contextFactory;
     }
     public ISessionStateUnitOfWork Create()
     {
-        var uof = new TUnitOfWork();
-        uof.SessionStateDbContext = _createContext();
+        var uof = new TUnitOfWork
+        {
+            SessionStateDbContext = _contextFactory.CreateBase()
+        };
 
         return uof;
     }

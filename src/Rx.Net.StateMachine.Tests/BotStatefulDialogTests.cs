@@ -1,5 +1,7 @@
 ﻿using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Rx.Net.StateMachine.EntityFramework;
 using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Persistance;
@@ -21,39 +23,40 @@ namespace Rx.Net.StateMachine.Tests
 {
     public abstract class BotStatefulDialogTests : IAsyncLifetime
     {
-        private IDisposable _buttonClickSubscription;
-        private readonly StateMachine _stateMachine;
         private readonly Guid _userId = Guid.NewGuid();
-        private readonly WorkflowResolver _workflowResolver;
-        private readonly WorkflowManager<UserContext> _workflowManager;
-        private readonly BotFake _botFake;
-        private readonly ItemsManager _itemsManager;
-        private readonly Func<SessionStateDbContext<UserContext, Guid>> _createContext;
 
-        private BotStatefulDialogTests(Func<SessionStateDbContext<UserContext, Guid>> createContext, ISessionStateUnitOfWorkFactory repositoryFactory)
+        private readonly ServiceProvider _services;
+
+        private IDisposable _buttonClickSubscription;
+        private StateMachine _stateMachine => _services.GetRequiredService<StateMachine>();
+        private IWorkflowResolver _workflowResolver => _services.GetRequiredService<IWorkflowResolver>();
+        private WorkflowManager<UserContext> _workflowManager => _services.GetRequiredService<WorkflowManager<UserContext>>();
+        private BotFake _botFake => _services.GetRequiredService<BotFake>();
+        private ItemsManager _itemsManager => _services.GetRequiredService<ItemsManager>();
+        private SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, Guid> _contextFactory => 
+            _services.GetRequiredService<SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, Guid>>();
+
+        private BotStatefulDialogTests(Func<TestSessionStateDbContext> createContext)
         {
-            _botFake = new BotFake();
-            _itemsManager = new ItemsManager(
+            var services = new ServiceCollection();
+            services.AddSingleton(createContext);
+            services.AddSingleton<BotFake>();
+            services.AddSingleton(new ItemsManager(
                 new Item { Id = Guid.NewGuid(), Name = "Task 1", Status = ItemStatus.ToDo },
                 new Item { Id = Guid.NewGuid(), Name = "Task 2", Status = ItemStatus.ToDo },
                 new Item { Id = Guid.NewGuid(), Name = "Task 3", Status = ItemStatus.InProgress }
-            );
+            ));
+            services.AddStateMachine<UserContext>()
+                .AddWorkflowFactory<TaskActionsWorkflowFactory>()
+                .AddWorkflowFactory<EditItemWorkflowFactory>();
+            services.AddEFStateMachine()
+                .WithContext<UserContext>()
+                .WithKey(uc => uc.UserId)
+                .WithDbContext(createContext)
+                .WithUnitOfWork<TestEFSessionStateUnitOfWork>();
+            _services = services.BuildServiceProvider();
 
-            _stateMachine = new StateMachine(new JsonSerializerOptions());
-            var workflowManagerAccessor = new WorkflowManagerAccessor<UserContext>();
-            _workflowResolver = new WorkflowResolver(
-                new TaskActionsWorkflowFactory(_botFake, _itemsManager, _stateMachine, workflowManagerAccessor),
-                new EditItemWorkflowFactory(_botFake, _itemsManager)
-            );
-            _workflowManager = new WorkflowManager<UserContext>(
-                new JsonSerializerOptions(),
-                repositoryFactory,
-                _workflowResolver,
-                _stateMachine
-            );
-            workflowManagerAccessor.Initialize(_workflowManager);
             _buttonClickSubscription = _botFake.ButtonClick.SelectAsync(click => HandleButtonClick(click)).Merge().Subscribe();
-            _createContext = createContext;
         }
 
         [Trait("Category", "Fast")]
@@ -64,11 +67,7 @@ namespace Rx.Net.StateMachine.Tests
             }
 
             private Fast(string databaseName) :
-                this(() => new TestSessionStateDbContext(new DbContextOptionsBuilder().UseInMemoryDatabase(databaseName).Options))
-            {
-            }
-            private Fast(Func<TestSessionStateDbContext> createContext)
-                : base(createContext, new EFSessionStateUnitOfWorkFactory<UserContext, Guid, TestEFSessionStateUnitOfWork>(createContext))
+                base(() => new TestSessionStateDbContext(new DbContextOptionsBuilder().UseInMemoryDatabase(databaseName).Options))
             {
             }
         }
@@ -82,30 +81,27 @@ namespace Rx.Net.StateMachine.Tests
             }
 
             private Slow(string databaseName) :
-                this(() => new TestSessionStateDbContext(new DbContextOptionsBuilder()
+                base(() => new TestSessionStateDbContext(new DbContextOptionsBuilder()
                     .UseSqlServer("Data Source =.; Integrated Security = True; TrustServerCertificate=True; Initial Catalog=TestDatabase;".Replace("TestDatabase", databaseName))
                     .Options))
             {
 
             }
-            private Slow(Func<TestSessionStateDbContext> createContext)
-                : base(createContext, new EFSessionStateUnitOfWorkFactory<UserContext, Guid, TestEFSessionStateUnitOfWork>(createContext))
-            {
-            }
         }
 
         public async Task InitializeAsync()
         {
-            await using var context = _createContext();
+            await using var context = _contextFactory.Create();
             await context.Database.EnsureCreatedAsync();
         }
 
         public async Task DisposeAsync()
         {
-            await using var context = _createContext();
+            await using var context = _contextFactory.Create();
             await context.Database.EnsureDeletedAsync();
 
             _buttonClickSubscription.Dispose();
+            await _services.DisposeAsync();
         }
 
         [Fact]

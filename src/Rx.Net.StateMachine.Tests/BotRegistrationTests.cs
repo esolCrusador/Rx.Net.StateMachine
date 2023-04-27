@@ -1,5 +1,8 @@
 ﻿using FluentAssertions;
+using FluentAssertions.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Rx.Net.StateMachine.EntityFramework;
 using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Persistance;
@@ -30,26 +33,30 @@ namespace Rx.Net.StateMachine.Tests
     }
     public abstract class BotRegistrationTests : IAsyncLifetime
     {
-        private readonly WorkflowResolver _workflowResolver;
-        private readonly WorkflowManager<UserContext> _workflowManager;
+        private readonly ServiceProvider _services;
+        private WorkflowManager<UserContext> _workflowManager => _services.GetRequiredService<WorkflowManager<UserContext>>();
         private readonly IDisposable _messagesHandling;
-        private readonly BotFake _botFake;
-        private readonly Func<SessionStateDbContext<UserContext, Guid>> _createContext;
+        private BotFake _botFake => _services.GetRequiredService<BotFake>();
+        private SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, Guid> _createContextFactory => 
+            _services.GetRequiredService<SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, Guid>>();
         private BehaviorSubject<ConcurrentDictionary<Guid, HashSet<int>>> _handledMessages = new BehaviorSubject<ConcurrentDictionary<Guid, HashSet<int>>>(new ConcurrentDictionary<Guid, HashSet<int>>());
 
-        private BotRegistrationTests(Func<SessionStateDbContext<UserContext, Guid>> createContext, ISessionStateUnitOfWorkFactory repositoryFactory)
+        private BotRegistrationTests(Func<TestSessionStateDbContext> createContext)
         {
-            _botFake = new BotFake();
-            _workflowResolver = new WorkflowResolver(new BotRegistrationWorkflowFactory(_botFake));
+            var services = new ServiceCollection();
+            services.AddSingleton(createContext);
+            services.AddStateMachine<UserContext>();
+            services.AddWorkflowFactory<BotRegistrationWorkflowFactory>();
+            services.AddSingleton<BotFake>();
+            services.AddEFStateMachine()
+                .WithContext<UserContext>()
+                .WithKey(uc => uc.UserId)
+                .WithDbContext(createContext)
+                .WithUnitOfWork<TestEFSessionStateUnitOfWork>();
 
-            _workflowManager = new WorkflowManager<UserContext>(
-                new JsonSerializerOptions(),
-                repositoryFactory,
-                _workflowResolver
-            );
+            _services = services.BuildServiceProvider();
 
             _messagesHandling = _botFake.UserMessages.SelectAsync(m => HandleUserMessage(m)).Merge().Subscribe();
-            _createContext = createContext;
         }
 
         [Trait("Category", "Fast")]
@@ -60,11 +67,7 @@ namespace Rx.Net.StateMachine.Tests
             }
 
             private Fast(string databaseName) :
-                this(() => new TestSessionStateDbContext(new DbContextOptionsBuilder().UseInMemoryDatabase(databaseName).Options))
-            {
-            }
-            private Fast(Func<TestSessionStateDbContext> createContext)
-                : base(createContext, new EFSessionStateUnitOfWorkFactory<UserContext, Guid, TestEFSessionStateUnitOfWork>(createContext))
+                base(() => new TestSessionStateDbContext(new DbContextOptionsBuilder().UseInMemoryDatabase(databaseName).Options))
             {
             }
         }
@@ -78,32 +81,30 @@ namespace Rx.Net.StateMachine.Tests
             }
 
             private Slow(string databaseName) :
-                this(() => new TestSessionStateDbContext(new DbContextOptionsBuilder()
+                base(() => new TestSessionStateDbContext(new DbContextOptionsBuilder()
                     .UseSqlServer("Data Source =.; Integrated Security = True; TrustServerCertificate=True; Initial Catalog=TestDatabase;".Replace("TestDatabase", databaseName))
                     .Options))
             {
 
             }
-            private Slow(Func<TestSessionStateDbContext> createContext)
-                : base(createContext, new EFSessionStateUnitOfWorkFactory<UserContext, Guid, TestEFSessionStateUnitOfWork>(createContext))
-            {
-            }
         }
 
         public async Task InitializeAsync()
         {
-            await using var context = _createContext();
+            await using var context = _createContextFactory.Create();
             await context.Database.EnsureCreatedAsync();
         }
 
         public async Task DisposeAsync()
         {
-            await using var context = _createContext();
+            await using var context = _createContextFactory.Create();
             await context.Database.EnsureDeletedAsync();
 
             _handledMessages.OnCompleted();
             _handledMessages.Dispose();
             _messagesHandling.Dispose();
+
+            await _services.DisposeAsync();
         }
 
         [Fact]

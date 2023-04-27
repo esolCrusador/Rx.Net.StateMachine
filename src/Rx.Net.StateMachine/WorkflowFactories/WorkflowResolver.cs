@@ -8,10 +8,6 @@ namespace Rx.Net.StateMachine.WorkflowFactories
     {
         private readonly Dictionary<string, IWorkflowFactory> _workflowFactories;
 
-        public WorkflowResolver(params IWorkflowFactory[] workflowFactories)
-            : this((IEnumerable<IWorkflowFactory>)workflowFactories)
-        {
-        }
         public WorkflowResolver(IEnumerable<IWorkflowFactory> workflowFactories)
         {
             _workflowFactories = workflowFactories.ToDictionary(wf => wf.WorkflowId);

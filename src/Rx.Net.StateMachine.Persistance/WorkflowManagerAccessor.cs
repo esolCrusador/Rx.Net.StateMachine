@@ -1,20 +1,15 @@
-﻿using Rx.Net.StateMachine.Persistance.Entities;
-using System;
+﻿using System;
 
 namespace Rx.Net.StateMachine.Persistance
 {
     public class WorkflowManagerAccessor<TContext>
     {
-        private bool _isInitialized;
-        public WorkflowManager<TContext>? WorkflowManager { get; private set; }
+        private Lazy<WorkflowManager<TContext>> _workflowManager;
+        public WorkflowManager<TContext>? WorkflowManager => _workflowManager.Value;
 
-        public void Initialize(WorkflowManager<TContext> workflowManager)
+        public WorkflowManagerAccessor(Func<WorkflowManager<TContext>> createWorkflowManager)
         {
-            if (_isInitialized)
-                throw new InvalidOperationException($"{nameof(WorkflowManagerAccessor<TContext>)} is already initialized");
-
-            _isInitialized = true;
-            WorkflowManager = workflowManager;
+            _workflowManager = new Lazy<WorkflowManager<TContext>>(createWorkflowManager);
         }
     }
 }

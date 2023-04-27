@@ -6,26 +6,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reactive;
-using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.Persistance
 {
     public class WorkflowManager<TContext>
     {
-        private readonly JsonSerializerOptions _options;
         private readonly ISessionStateUnitOfWorkFactory _uofFactory;
         private readonly IWorkflowResolver _workflowResolver;
 
         public StateMachine StateMachine { get; }
 
-        public WorkflowManager(JsonSerializerOptions options, ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver)
-            : this(options, uofFactory, workflowResolver, new StateMachine(options))
-        { }
-
-        public WorkflowManager(JsonSerializerOptions options, ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, StateMachine stateMachine)
+        public WorkflowManager(ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, StateMachine stateMachine)
         {
-            _options = options;
             _uofFactory = uofFactory;
             _workflowResolver = workflowResolver;
             StateMachine = stateMachine;
