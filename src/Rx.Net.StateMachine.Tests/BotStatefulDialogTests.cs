@@ -33,8 +33,8 @@ namespace Rx.Net.StateMachine.Tests
         private WorkflowManager<UserContext> _workflowManager => _services.GetRequiredService<WorkflowManager<UserContext>>();
         private BotFake _botFake => _services.GetRequiredService<BotFake>();
         private ItemsManager _itemsManager => _services.GetRequiredService<ItemsManager>();
-        private SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, Guid> _contextFactory => 
-            _services.GetRequiredService<SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, Guid>>();
+        private SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, int> _contextFactory => 
+            _services.GetRequiredService<SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, int>>();
 
         private BotStatefulDialogTests(Func<TestSessionStateDbContext> createContext)
         {
@@ -51,7 +51,7 @@ namespace Rx.Net.StateMachine.Tests
                 .AddWorkflowFactory<EditItemWorkflowFactory>();
             services.AddEFStateMachine()
                 .WithContext<UserContext>()
-                .WithKey(uc => uc.UserId)
+                .WithKey(uc => uc.ContextId)
                 .WithDbContext(createContext)
                 .WithUnitOfWork<TestEFSessionStateUnitOfWork>();
             _services = services.BuildServiceProvider();

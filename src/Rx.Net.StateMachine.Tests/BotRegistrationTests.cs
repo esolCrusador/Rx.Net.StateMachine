@@ -37,8 +37,8 @@ namespace Rx.Net.StateMachine.Tests
         private WorkflowManager<UserContext> _workflowManager => _services.GetRequiredService<WorkflowManager<UserContext>>();
         private readonly IDisposable _messagesHandling;
         private BotFake _botFake => _services.GetRequiredService<BotFake>();
-        private SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, Guid> _createContextFactory => 
-            _services.GetRequiredService<SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, Guid>>();
+        private SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, int> _createContextFactory => 
+            _services.GetRequiredService<SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, int>>();
         private BehaviorSubject<ConcurrentDictionary<Guid, HashSet<int>>> _handledMessages = new BehaviorSubject<ConcurrentDictionary<Guid, HashSet<int>>>(new ConcurrentDictionary<Guid, HashSet<int>>());
 
         private BotRegistrationTests(Func<TestSessionStateDbContext> createContext)
@@ -50,7 +50,7 @@ namespace Rx.Net.StateMachine.Tests
             services.AddSingleton<BotFake>();
             services.AddEFStateMachine()
                 .WithContext<UserContext>()
-                .WithKey(uc => uc.UserId)
+                .WithKey(uc => uc.ContextId)
                 .WithDbContext(createContext)
                 .WithUnitOfWork<TestEFSessionStateUnitOfWork>();
 

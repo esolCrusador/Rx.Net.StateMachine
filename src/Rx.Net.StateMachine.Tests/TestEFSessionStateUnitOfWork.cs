@@ -9,9 +9,9 @@ using System.Reactive.Linq;
 
 namespace Rx.Net.StateMachine.Tests
 {
-    public class TestEFSessionStateUnitOfWork : EFSessionStateUnitOfWork<UserContext, Guid>
+    public class TestEFSessionStateUnitOfWork : EFSessionStateUnitOfWork<UserContext, int>
     {
-        protected override Expression<Func<SessionStateTable<UserContext, Guid>, bool>> GetFilter(object @event)
+        protected override Expression<Func<SessionStateTable<UserContext, int>, bool>> GetFilter(object @event)
         {
             if (@event is BotFrameworkMessage botFrameworkMessage)
                 return ss => ss.Context.UserId == botFrameworkMessage.UserId;

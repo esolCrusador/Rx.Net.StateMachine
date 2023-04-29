@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Rx.Net.StateMachine.Tests
 {
-    public class CompressionHelperTest
+    public class CompressionHelperTests
     {
         [Theory]
         [InlineData("{ Result: \"qqqqqqqqqqqqwewreewrwerewrwerwerew\", Steps: {\"Step1\": 123456, \"Step2\": 4543543543, \"Prefffffixxxxx.Step5\": \"qweqweqwwtrgfbfgtytrytrytrytrrwerew\", \"Prefffffixxxxx.Step6\": \"retertretertretertre\"}, \"Items\": {\"Item1\": \"wqewqerwrwgdfbvcbfhtrytyjhmnvcxdfeqqqsdadasgfdgertretgdfgfdgfdg\", \"RRRRRR.Item2\": \"32423essfdsfgdfghfghretertergdffgnvb vb swrwerewrwe\", \"eqwdsfstehfncsaeqweqeqtfsgfdgdf4\": \"weqw12fsdgtrrgfngfnfytrhnfhtw1qweqweqdsgertertre\" }}")]
