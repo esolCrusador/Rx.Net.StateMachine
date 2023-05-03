@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.Tests.Persistence;
-using System;
 
 namespace Rx.Net.StateMachine.Tests
 {
@@ -9,6 +8,14 @@ namespace Rx.Net.StateMachine.Tests
     {
         public TestSessionStateDbContext(DbContextOptions options) : base(options)
         {
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<UserContext>(builder =>
+            {
+                builder.HasIndex(uc => new { uc.BotId, uc.ChatId }).IsUnique();
+            });
         }
     }
 }

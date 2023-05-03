@@ -29,7 +29,7 @@ namespace Rx.Net.StateMachine.Persistance
             if (context == null)
                 throw new ArgumentNullException("context");
 
-            using var uof = _uofFactory.Create();
+            await using var uof = _uofFactory.Create();
             var newSessionStateEntity = CreateNewSessionState(workflowId, uof, context);
             var sessionState = ToSessionState(newSessionStateEntity);
 
@@ -41,7 +41,7 @@ namespace Rx.Net.StateMachine.Persistance
             if (context == null)
                 throw new ArgumentNullException("context");
 
-            using var uof = _uofFactory.Create();
+            await using var uof = _uofFactory.Create();
             var newSessionStateEntity = CreateNewSessionState(workflowId, uof, context);
             var sessionState = ToSessionState(newSessionStateEntity);
 
@@ -53,7 +53,7 @@ namespace Rx.Net.StateMachine.Persistance
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
 
-            using var uof = _uofFactory.Create();
+            await using var uof = _uofFactory.Create();
             var eventType = SessionEventAwaiter.GetTypeName(@event.GetType());
 
             var sessionStates = await uof.GetSessionStates(@event);

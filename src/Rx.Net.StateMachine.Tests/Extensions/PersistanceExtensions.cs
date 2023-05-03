@@ -41,7 +41,7 @@ namespace Rx.Net.StateMachine.Tests.Extensions
             return scope.DeleteItem(collectionName);
         }
 
-        public static IObservable<TSource> DeleteMssages<TSource>(this IObservable<TSource> source, StateMachineScope scope, BotFake botFake, string collectionName = "Messages")
+        public static IObservable<TSource> DeleteMssages<TSource>(this IObservable<TSource> source, StateMachineScope scope, ChatFake botFake, string collectionName = "Messages")
         {
             return source.FinallyAsync(async (isExecuted, source, ex) =>
             {
@@ -55,7 +55,7 @@ namespace Rx.Net.StateMachine.Tests.Extensions
                 foreach (var messages in allMessages)
                     foreach (var message in messages)
                         deleteTasks.Add(
-                            botFake.DeleteBotMessage(scope.GetContext<UserContext>().UserId, message)
+                            botFake.DeleteBotMessage(scope.GetContext<UserContext>().BotId, scope.GetContext<UserContext>().ChatId, message)
                         );
                 await Task.WhenAll(deleteTasks);
             });

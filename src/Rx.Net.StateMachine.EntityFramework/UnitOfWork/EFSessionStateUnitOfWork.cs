@@ -3,6 +3,7 @@ using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.EntityFramework.Extensions;
 using Rx.Net.StateMachine.EntityFramework.Tables;
 using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
+using Rx.Net.StateMachine.EntityFramework.UnitOfWork;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Persistance.Entities;
 using System;
@@ -30,11 +31,17 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         }
         private readonly Dictionary<Guid, SessionStateData> _loadedSessionStates;
         private SessionStateDbContext<TContext, TContextKey>? _sessionStateContext;
+        private ContextKeySelector<TContext, TContextKey>? _contextKeySelector;
 
         protected internal SessionStateDbContext<TContext, TContextKey> SessionStateDbContext
         {
             get => _sessionStateContext ?? throw new ArgumentException($"{nameof(SessionStateDbContext)} is not initialized");
             set => _sessionStateContext = value;
+        }
+        protected internal ContextKeySelector<TContext, TContextKey> ContextKeySelector
+        {
+            get => _contextKeySelector ?? throw new ArgumentException($"{nameof(ContextKeySelector)} is not initialized");
+            set => _contextKeySelector = value;
         }
 
         public EFSessionStateUnitOfWork()
@@ -50,9 +57,9 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 Awaiters = new()
             };
             Map(sessionState, row);
+            row.ContextId = ContextKeySelector.GetContextKey((TContext)sessionState.Context);
             _loadedSessionStates.Add(row.SessionStateId, new SessionStateData(sessionState, row));
             SessionStateDbContext.SessionStates.Add(row);
-            SessionStateDbContext.Contexts.Add(row.Context);
 
             return Task.CompletedTask;
         }
@@ -96,7 +103,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             {
                 AwaiterId = aw.AwaiterId,
                 SequenceNumber = aw.SequenceNumber,
-                TypeName = aw.TypeName
+                TypeName = aw.TypeName,
             }).ToList();
 
             dest.Status = source.Status;
@@ -129,7 +136,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                         SessionStateId = source.SessionStateId,
                         SequenceNumber = aw.SequenceNumber,
                         TypeName = aw.TypeName,
-                        Context = (TContext)source.Context
+                        ContextId = dest.ContextId
                     };
                     SessionStateDbContext.Add(awaiter);
                     dest.Awaiters.Add(awaiter);
@@ -138,7 +145,6 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 
             dest.Status = source.Status;
             dest.Result = source.Result;
-            dest.Context = (TContext)source.Context;
         }
 
         protected IReadOnlyCollection<SessionStateEntity> MapToSessionStates(IEnumerable<SessionStateTable<TContext, TContextKey>> source)

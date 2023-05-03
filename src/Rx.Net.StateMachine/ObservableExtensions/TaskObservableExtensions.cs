@@ -32,6 +32,15 @@ namespace Rx.Net.StateMachine.ObservableExtensions
                 return Observable.FromAsync(cancellation => execute(source));
             });
 
+        public static IObservable<TSource> Tap<TSource>(this IObservable<TSource> source, Action<TSource> execute)
+        {
+            return source.Select(source =>
+            {
+                execute(source);
+                return source;
+            });
+        }
+
         public static IObservable<TSource> TapAsync<TSource>(this IObservable<TSource> source, Func<TSource, Task> execute)
         {
             return source.SelectAsync(async source =>

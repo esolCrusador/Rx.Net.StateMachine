@@ -2,12 +2,13 @@
 using Rx.Net.StateMachine.States;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace Rx.Net.StateMachine.EntityFramework.Tables
 {
     public class SessionStateTable<TContext, TContextKey>
     {
-        public Guid SessionStateId { get; set; }
+        [Key] public Guid SessionStateId { get; set; }
         public string WorkflowId { get; set; }
         public int Counter { get; set; }
         public string Steps { get; set; }

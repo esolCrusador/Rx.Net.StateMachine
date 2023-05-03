@@ -1,10 +1,11 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace Rx.Net.StateMachine.EntityFramework.Tests.Tables
 {
     public class SessionEventAwaiterTable<TContext, TContextKey>
     {
-        public Guid AwaiterId { get; set; }
+        [Key] public Guid AwaiterId { get; set; }
         public Guid SessionStateId { get; set; }
         public string TypeName { get; set; }
         public int SequenceNumber { get; set; }
