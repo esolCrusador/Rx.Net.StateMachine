@@ -13,7 +13,9 @@ namespace Rx.Net.StateMachine.Tests.Fakes
 {
     public class ChatFake : IDisposable
     {
+        private Dictionary<long, UserInfo> _users { get; set; } = new();
         private Bots _bots = new();
+
 
         class BotMessages
         {
@@ -71,6 +73,14 @@ namespace Rx.Net.StateMachine.Tests.Fakes
             _buttonClicks.Dispose();
         }
 
+        public Task<long> RegisterUser(UserInfo user)
+        {
+            user.UserId = new Random().NextInt64(long.MaxValue);
+            _users[user.UserId] = user;
+
+            return Task.FromResult(user.UserId);
+        }
+
         public IReadOnlyCollection<string> ReadNewBotMessageTexts(long botId, long chatId)
         {
             return ReadNewBotMessages(botId, chatId).Select(m => m.Text).ToList();
@@ -99,7 +109,7 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         public Task<int> SendBotMessage(long botId, long chatId, string message, int? replyToMessageId = default)
         {
             var messageId = GetNextBotMessageId(botId, chatId);
-            return SendBotMessage(new BotFrameworkMessage(messageId, botId, chatId, MessageSource.Bot, message)
+            return SendBotMessage(new BotFrameworkMessage(messageId, botId, chatId, MessageSource.Bot, message, _users[chatId])
             {
                 ReplyToMessageId = replyToMessageId
             });
@@ -113,7 +123,7 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         public Task<int> SendButtonsBotMessage(long botId, long chatId, string message, int? replyToMessageId, params KeyValuePair<string, string>[] buttons)
         {
             var messageId = GetNextBotMessageId(botId, chatId);
-            return SendBotMessage(new BotFrameworkMessage(messageId, botId, chatId, MessageSource.Bot, message)
+            return SendBotMessage(new BotFrameworkMessage(messageId, botId, chatId, MessageSource.Bot, message, _users[chatId])
             {
                 Buttons = buttons,
                 ReplyToMessageId = replyToMessageId
@@ -123,7 +133,7 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         public Task UpdateBotMessage(long botId, long chatId, int messageId, string message, params KeyValuePair<string, string>[] buttons)
         {
             var messageIndex = GetUserMessages(botId, chatId).FindIndex(m => m.MessageId == messageId);
-            GetUserMessages(botId, chatId)[messageIndex] = new BotFrameworkMessage(messageId, botId, chatId, MessageSource.Bot, message)
+            GetUserMessages(botId, chatId)[messageIndex] = new BotFrameworkMessage(messageId, botId, chatId, MessageSource.Bot, message, _users[chatId])
             {
                 Buttons = buttons.Length == 0 ? null : buttons,
                 ReplyToMessageId = GetUserMessages(botId, chatId)[messageIndex].ReplyToMessageId
@@ -150,7 +160,7 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         {
             var messages = GetUserMessages(botId, chatId);
             int messageId = GetNextBotMessageId(botId, chatId);
-            var message = new BotFrameworkMessage(messageId, botId, chatId, MessageSource.User, messageText);
+            var message = new BotFrameworkMessage(messageId, botId, chatId, MessageSource.User, messageText, _users[chatId]);
             messages.Add(message);
             var handled = _userMessageHandled.Where(m => m == message).Take(handledCount).Timeout(TimeSpan.FromSeconds(10)).ToTask();
             _userMessages.OnNext(message);

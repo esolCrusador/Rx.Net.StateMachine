@@ -6,10 +6,10 @@ using Rx.Net.StateMachine.EntityFramework;
 using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Persistance;
+using Rx.Net.StateMachine.Tests.DataAccess;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
-using Rx.Net.StateMachine.Tests.Repositories;
 using Rx.Net.StateMachine.WorkflowFactories;
 using System;
 using System.Collections.Concurrent;
@@ -108,7 +108,12 @@ namespace Rx.Net.StateMachine.Tests
         [Fact]
         public async Task Should_Return_User_Information()
         {
-            var chatId = new Random().NextInt64(long.MaxValue);
+            var chatId = await _chatFake.RegisterUser(new UserInfo
+            {
+                FirstName = "Boris",
+                LastName = "Sotsky",
+                Username = "esolCrusador"
+            });
             await _chatFake.SendUserMessage(_botId, chatId, "/Start");
 
             var botMessages = _chatFake.ReadNewBotMessageTexts(_botId, chatId);
@@ -140,25 +145,30 @@ namespace Rx.Net.StateMachine.Tests
         [Fact]
         public async Task Should_Ask_To_Reenter_FirstName_If_Not_Valid()
         {
-            var boris = new Random().NextInt64(long.MaxValue);
-            await _chatFake.SendUserMessage(_botId, boris, "/Start");
+            var chatId = await _chatFake.RegisterUser(new UserInfo
+            {
+                FirstName = "Boris",
+                LastName = "Sotsky",
+                Username = "esolCrusador"
+            });
+            await _chatFake.SendUserMessage(_botId, chatId, "/Start");
 
-            var botMessages = _chatFake.ReadNewBotMessageTexts(_botId, boris);
+            var botMessages = _chatFake.ReadNewBotMessageTexts(_botId, chatId);
             botMessages.Should().BeEquivalentTo("Hello, please follow steps to pass registration process", "Please enter your first name");
 
-            await _chatFake.SendUserMessage(_botId, boris, "   ");
-            botMessages = _chatFake.ReadNewBotMessageTexts(_botId, boris);
+            await _chatFake.SendUserMessage(_botId, chatId, "   ");
+            botMessages = _chatFake.ReadNewBotMessageTexts(_botId, chatId);
             botMessages.Should().BeEquivalentTo("Oops first name is not valid, please try again", "Please enter your first name");
 
-            await _chatFake.SendUserMessage(_botId, boris, " ");
-            botMessages = _chatFake.ReadNewBotMessageTexts(_botId, boris);
+            await _chatFake.SendUserMessage(_botId, chatId, " ");
+            botMessages = _chatFake.ReadNewBotMessageTexts(_botId, chatId);
             botMessages.Should().BeEquivalentTo("Oops first name is not valid, please try again", "Please enter your first name");
 
-            await _chatFake.SendUserMessage(_botId, boris, "Boris");
-            botMessages = _chatFake.ReadNewBotMessageTexts(_botId, boris);
+            await _chatFake.SendUserMessage(_botId, chatId, "Boris");
+            botMessages = _chatFake.ReadNewBotMessageTexts(_botId, chatId);
             botMessages.Should().BeEquivalentTo("Please enter your last name");
 
-            var allMessages = _chatFake.ReadAllMessageTexts(_botId, boris);
+            var allMessages = _chatFake.ReadAllMessageTexts(_botId, chatId);
             allMessages.Count.Should().Be(3);
             allMessages.First().Should().Be("/Start");
             allMessages.Skip(1).First().Should().Contain("Hello");
@@ -167,7 +177,10 @@ namespace Rx.Net.StateMachine.Tests
 
         private async Task HandleUserMessage(BotFrameworkMessage message)
         {
-            var userContext = await UserContextRepository.GetUserContext(message.BotId, message.ChatId);
+            var userContext = await UserContextRepository.GetUserOrCreateContext(message.BotId, message.ChatId,
+                message.UserInfo.Name,
+                message.UserInfo.Username ?? message.UserInfo.UserId.ToString()
+            );
 
             if (string.Equals(message.Text, "/start", StringComparison.OrdinalIgnoreCase))
                 await _workflowManager.StartHandle(BotRegistrationWorkflowFactory.Id, userContext);

@@ -5,10 +5,10 @@ using Rx.Net.StateMachine.EntityFramework;
 using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Persistance;
+using Rx.Net.StateMachine.Tests.DataAccess;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
-using Rx.Net.StateMachine.Tests.Repositories;
 using Rx.Net.StateMachine.WorkflowFactories;
 using System;
 using System.Collections.Generic;
@@ -25,13 +25,13 @@ namespace Rx.Net.StateMachine.Tests
     public abstract class BotStatefulDialogTests : IAsyncLifetime
     {
         private readonly long _botId = new Random().NextInt64(long.MaxValue);
-        private readonly long _chatId = new Random().NextInt64(long.MaxValue);
+        private long _chatId;
         private readonly ServiceProvider _services;
 
         private StateMachine _stateMachine => _services.GetRequiredService<StateMachine>();
         private IWorkflowResolver _workflowResolver => _services.GetRequiredService<IWorkflowResolver>();
         private WorkflowManager<UserContext> _workflowManager => _services.GetRequiredService<WorkflowManager<UserContext>>();
-        private ChatFake _botFake => _services.GetRequiredService<ChatFake>();
+        private ChatFake ChatFake => _services.GetRequiredService<ChatFake>();
         private ItemsManager _itemsManager => _services.GetRequiredService<ItemsManager>();
         private UserContextRepository UserContextRepository => _services.GetRequiredService<UserContextRepository>();
         private SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, int> _contextFactory =>
@@ -96,6 +96,13 @@ namespace Rx.Net.StateMachine.Tests
         {
             await using var context = _contextFactory.Create();
             await context.Database.EnsureCreatedAsync();
+
+            _chatId = await ChatFake.RegisterUser(new UserInfo
+            {
+                FirstName = "Boris",
+                LastName = "Sotsky",
+                Username = "esolCrusador"
+            });
         }
 
         public async Task DisposeAsync()
@@ -110,11 +117,11 @@ namespace Rx.Net.StateMachine.Tests
         public async Task Should_React_On_Play_Button()
         {
             await ShowItems();
-            var messages = _botFake.ReadNewBotMessages(_botId, _chatId);
+            var messages = ChatFake.ReadNewBotMessages(_botId, _chatId);
             var secondMessage = messages.Skip(1).First();
 
-            await _botFake.ClickButton(secondMessage, secondMessage.Buttons.First().Value);
-            var updatedMessage = _botFake.ReadMessage(_botId, _chatId, secondMessage.MessageId);
+            await ChatFake.ClickButton(secondMessage, secondMessage.Buttons.First().Value);
+            var updatedMessage = ChatFake.ReadMessage(_botId, _chatId, secondMessage.MessageId);
             updatedMessage.Buttons.First().Key.Should().Be("Pause");
         }
 
@@ -122,13 +129,13 @@ namespace Rx.Net.StateMachine.Tests
         public async Task Should_React_On_Pause_Button()
         {
             await ShowItems();
-            var messages = _botFake.ReadNewBotMessages(_botId, _chatId);
+            var messages = ChatFake.ReadNewBotMessages(_botId, _chatId);
             var secondMessage = messages.Skip(1).First();
 
-            await _botFake.ClickButton(secondMessage, secondMessage.Buttons.First().Value);
-            secondMessage = _botFake.ReadMessage(_botId, _chatId, secondMessage.MessageId);
-            await _botFake.ClickButton(secondMessage, secondMessage.Buttons.First().Value);
-            secondMessage = _botFake.ReadMessage(_botId, _chatId, secondMessage.MessageId);
+            await ChatFake.ClickButton(secondMessage, secondMessage.Buttons.First().Value);
+            secondMessage = ChatFake.ReadMessage(_botId, _chatId, secondMessage.MessageId);
+            await ChatFake.ClickButton(secondMessage, secondMessage.Buttons.First().Value);
+            secondMessage = ChatFake.ReadMessage(_botId, _chatId, secondMessage.MessageId);
             secondMessage.Buttons.First().Key.Should().Be("Play");
         }
 
@@ -136,11 +143,11 @@ namespace Rx.Net.StateMachine.Tests
         public async Task Should_React_On_Delete_Button()
         {
             await ShowItems();
-            var messages = _botFake.ReadNewBotMessages(_botId, _chatId);
+            var messages = ChatFake.ReadNewBotMessages(_botId, _chatId);
             var secondMessage = messages.Skip(1).First();
 
-            await _botFake.ClickButton(secondMessage, secondMessage.Buttons.Last().Value);
-            secondMessage = _botFake.ReadMessage(_botId, _chatId, secondMessage.MessageId);
+            await ChatFake.ClickButton(secondMessage, secondMessage.Buttons.Last().Value);
+            secondMessage = ChatFake.ReadMessage(_botId, _chatId, secondMessage.MessageId);
             secondMessage.Should().BeNull();
             _itemsManager.GetItems().Count.Should().Be(2);
         }
@@ -150,13 +157,13 @@ namespace Rx.Net.StateMachine.Tests
         {
             await ShowItems();
 
-            var messages = _botFake.ReadNewBotMessages(_botId, _chatId);
+            var messages = ChatFake.ReadNewBotMessages(_botId, _chatId);
             var secondMessage = messages.Skip(1).First();
 
-            await _botFake.ClickButton(secondMessage, secondMessage.Buttons.Skip(1).First().Value);
-            var confirmation = _botFake.ReadNewBotMessages(_botId, _chatId).Single();
+            await ChatFake.ClickButton(secondMessage, secondMessage.Buttons.Skip(1).First().Value);
+            var confirmation = ChatFake.ReadNewBotMessages(_botId, _chatId).Single();
 
-            await _botFake.ClickButton(secondMessage, confirmation.Buttons.First(b => b.Key == "Yes").Value);
+            await ChatFake.ClickButton(secondMessage, confirmation.Buttons.First(b => b.Key == "Yes").Value);
         }
 
         private async Task ShowItems()
@@ -167,7 +174,7 @@ namespace Rx.Net.StateMachine.Tests
 
         private async Task ShowItem(Item item)
         {
-            var context = await UserContextRepository.GetUserContext(_botId, _chatId);
+            var context = await UserContextRepository.GetUserOrCreateContext(_botId, _chatId, "Boris Sotsky", "esolCrusador");
 
             await _stateMachine.StartHandleWorkflow(new ItemWithMessage(item, null), context,
                 await _workflowResolver.GetWorkflowFactory<ItemWithMessage, Unit>(TaskActionsWorkflowFactory.Id)

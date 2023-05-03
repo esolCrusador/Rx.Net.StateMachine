@@ -7,7 +7,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reactive.Linq;
 
-namespace Rx.Net.StateMachine.Tests
+namespace Rx.Net.StateMachine.Tests.DataAccess
 {
     public class TestEFSessionStateUnitOfWork : EFSessionStateUnitOfWork<UserContext, int>
     {
@@ -15,8 +15,8 @@ namespace Rx.Net.StateMachine.Tests
         {
             if (@event is BotFrameworkMessage botFrameworkMessage)
                 return ss => ss.Context.BotId == botFrameworkMessage.BotId && ss.Context.ChatId == botFrameworkMessage.ChatId;
-            if(@event is BotFrameworkButtonClick botFrameworkButtonClick)
-                return ss => ss.Awaiters.Any(aw => aw.Context.BotId == botFrameworkButtonClick.BotId 
+            if (@event is BotFrameworkButtonClick botFrameworkButtonClick)
+                return ss => ss.Awaiters.Any(aw => aw.Context.BotId == botFrameworkButtonClick.BotId
                     && aw.Context.ChatId == botFrameworkButtonClick.ChatId
                     && aw.TypeName == typeof(BotFrameworkButtonClick).AssemblyQualifiedName
                 );
