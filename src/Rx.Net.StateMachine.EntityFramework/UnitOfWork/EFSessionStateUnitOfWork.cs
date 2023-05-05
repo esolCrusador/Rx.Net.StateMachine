@@ -6,6 +6,7 @@ using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
 using Rx.Net.StateMachine.EntityFramework.UnitOfWork;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Persistance.Entities;
+using Rx.Net.StateMachine.States;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -70,6 +71,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 .Include(ss => ss.Context)
                 .Include(ss => ss.Awaiters)
                 .Where(GetFilter(@event))
+                .Where(ss => ss.Status == SessionStateStatus.InProgress)
                 .ToListAsync();
 
             return MapToSessionStates(sessions);
@@ -91,8 +93,10 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 
         private void Map(SessionStateTable<TContext, TContextKey> source, SessionStateEntity dest)
         {
+            dest.SessionStateId = source.SessionStateId;
             dest.WorkflowId = source.WorkflowId;
             dest.Counter = source.Counter;
+            dest.IsDefault = source.IsDefault;
             dest.Steps = JsonSerializer.Deserialize<List<SessionStepEntity>>(source.Steps)
                 ?? throw new ArgumentException("Steps must be not null");
             dest.Items = JsonSerializer.Deserialize<List<SessionItemEntity>>(source.Items)
@@ -103,6 +107,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             {
                 AwaiterId = aw.AwaiterId,
                 SequenceNumber = aw.SequenceNumber,
+                Name = aw.Name,
                 TypeName = aw.TypeName,
             }).ToList();
 
@@ -115,7 +120,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         {
             dest.WorkflowId = source.WorkflowId;
             dest.Counter = source.Counter;
-
+            dest.IsDefault = source.IsDefault;
             dest.Steps = JsonSerializer.Serialize(source.Steps);
             dest.Items = JsonSerializer.Serialize(source.Items);
             dest.PastEvents = JsonSerializer.Serialize(source.PastEvents);
@@ -135,6 +140,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                         AwaiterId = aw.AwaiterId,
                         SessionStateId = source.SessionStateId,
                         SequenceNumber = aw.SequenceNumber,
+                        Name = aw.Name,
                         TypeName = aw.TypeName,
                         ContextId = dest.ContextId
                     };

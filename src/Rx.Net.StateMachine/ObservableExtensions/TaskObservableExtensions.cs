@@ -20,6 +20,12 @@ namespace Rx.Net.StateMachine.ObservableExtensions
                 return Observable.FromAsync(cancellation => execute(source));
             });
 
+        public static IObservable<IObservable<TResult>> SelectAsync<TSource, TResult>(this IObservable<TSource> source, Func<Task<TResult>> execute) =>
+            source.Select(source =>
+            {
+                return Observable.FromAsync(cancellation => execute());
+            });
+
         public static IObservable<IObservable<Unit>> SelectAsync<TSource>(this IObservable<TSource> source, Func<TSource, CancellationToken, Task> execute) =>
             source.Select(source =>
             {
@@ -32,20 +38,26 @@ namespace Rx.Net.StateMachine.ObservableExtensions
                 return Observable.FromAsync(cancellation => execute(source));
             });
 
-        public static IObservable<TSource> Tap<TSource>(this IObservable<TSource> source, Action<TSource> execute)
-        {
-            return source.Select(source =>
+        public static IObservable<IObservable<Unit>> SelectAsync<TSource>(this IObservable<TSource> source, Func<Task> execute) =>
+            source.Select(source =>
             {
-                execute(source);
-                return source;
+                return Observable.FromAsync(cancellation => execute());
             });
-        }
 
         public static IObservable<TSource> TapAsync<TSource>(this IObservable<TSource> source, Func<TSource, Task> execute)
         {
             return source.SelectAsync(async source =>
             {
                 await execute(source);
+                return source;
+            }).Concat();
+        }
+
+        public static IObservable<TSource> TapAsync<TSource>(this IObservable<TSource> source, Func<Task> execute)
+        {
+            return source.SelectAsync(async source =>
+            {
+                await execute();
                 return source;
             }).Concat();
         }
@@ -57,16 +69,32 @@ namespace Rx.Net.StateMachine.ObservableExtensions
             return Observable.Create<TSource>(observer =>
             {
                 bool isExecuted = false;
+                bool isFinalized = false;
                 TSource lastSource = default;
-                return sourceObservable.Subscribe(
-                    source => {
+                var subscrption = sourceObservable.Subscribe(
+                    source =>
+                    {
                         lastSource = source;
                         isExecuted = true;
                         observer.OnNext(source);
                     },
-                    ex => handle(true, lastSource, ex).ContinueWith(_ => observer.OnError(ex)),
-                    () => handle(isExecuted, lastSource, null).ContinueWith(_ => observer.OnCompleted())
-                );
+                    ex =>
+                    {
+                        handle(true, lastSource, ex).ContinueWith(_ => observer.OnError(ex));
+                        isFinalized = true;
+                    },
+                    () =>
+                    {
+                        handle(isExecuted, lastSource, null).ContinueWith(_ => observer.OnCompleted());
+                        isFinalized = true;
+                    });
+
+                return () =>
+                {
+                    if (!isFinalized)
+                        handle(isExecuted, lastSource, null);
+                    subscrption.Dispose();
+                };
             });
         }
     }

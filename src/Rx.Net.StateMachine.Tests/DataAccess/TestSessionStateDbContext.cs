@@ -7,12 +7,16 @@ namespace Rx.Net.StateMachine.Tests.DataAccess
 {
     public class TestSessionStateDbContext : SessionStateDbContext<UserContext, int>
     {
+        public DbSet<TaskEntity> Tasks { get; set; }
+        public DbSet<TaskCommentEntity> TaskComments { get; set; }
         public TestSessionStateDbContext(DbContextOptions options) : base(options)
         {
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            base.OnModelCreating(modelBuilder);
+
             modelBuilder.Entity<UserContext>(builder =>
             {
                 builder.HasIndex(uc => new { uc.BotId, uc.ChatId }).IsUnique();

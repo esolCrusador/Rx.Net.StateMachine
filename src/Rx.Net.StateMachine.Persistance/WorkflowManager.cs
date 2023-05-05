@@ -125,13 +125,15 @@ namespace Rx.Net.StateMachine.Persistance
         private static SessionState ToSessionState(SessionStateEntity entity)
         {
             return new SessionState(
+                entity.SessionStateId,
                 entity.WorkflowId,
                 entity.Context,
+                entity.IsDefault,
                 entity.Counter,
                 entity.Steps.ToDictionary(s => s.Id, s => new SessionStateStep(s.State, s.SequenceNumber)),
                 entity.Items.ToDictionary(i => i.Id, i => i.Value),
                 MapSessionEvents(entity.PastEvents),
-                entity.Awaiters.Select(aw => new SessionEventAwaiter(aw.AwaiterId, aw.TypeName, aw.SequenceNumber)).ToList()
+                entity.Awaiters.Select(aw => new SessionEventAwaiter(aw.AwaiterId, aw.Name, aw.TypeName, aw.SequenceNumber)).ToList()
             )
             {
                 Status = entity.Status,
@@ -142,6 +144,7 @@ namespace Rx.Net.StateMachine.Persistance
         private static void UpdateSessionStateEntity(SessionState state, SessionStateEntity dest)
         {
             dest.WorkflowId = state.WorkflowId;
+            dest.IsDefault = state.IsDefault;
             dest.Steps = state.Steps.Select(kvp =>
                     new SessionStepEntity
                     {
@@ -159,6 +162,7 @@ namespace Rx.Net.StateMachine.Persistance
             dest.Awaiters = state.SessionEventAwaiters.Select(aw => new SessionEventAwaiterEntity
             {
                 AwaiterId = aw.AwaiterId,
+                Name = aw.Name,
                 TypeName = aw.TypeName,
                 SequenceNumber = aw.SequenceNumber
             }).ToList();

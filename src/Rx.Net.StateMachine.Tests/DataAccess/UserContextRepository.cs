@@ -47,5 +47,11 @@ namespace Rx.Net.StateMachine.Tests.DataAccess
 
             return userContext;
         }
+
+        public async Task<UserContext?> GetUserContext(Guid userId)
+        {
+            await using var context = _contextFactory.Create();
+            return await context.Contexts.FirstOrDefaultAsync(ctx => ctx.UserId == userId);
+        }
     }
 }

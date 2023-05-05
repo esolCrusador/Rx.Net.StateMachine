@@ -1,5 +1,5 @@
-﻿using System;
-using System.Collections;
+﻿using Rx.Net.StateMachine.Tests.Models;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -11,6 +11,7 @@ namespace Rx.Net.StateMachine.Tests.Entities
         [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)] public int TaskId { get; set; }
         public string Title { get; set; }
         public string Description { get; set; }
+        public TaskState State { get; set; }
         public Guid AssigneeId { get; set; }
         public Guid SupervisorId { get; set; }
 

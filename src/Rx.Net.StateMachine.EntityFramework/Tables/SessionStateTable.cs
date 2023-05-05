@@ -10,6 +10,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tables
     {
         [Key] public Guid SessionStateId { get; set; }
         public string WorkflowId { get; set; }
+        public int IsDefault { get; set; }
         public int Counter { get; set; }
         public string Steps { get; set; }
         public string Items { get; set; }

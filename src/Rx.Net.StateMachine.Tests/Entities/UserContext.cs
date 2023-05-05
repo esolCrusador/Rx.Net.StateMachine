@@ -1,4 +1,5 @@
-﻿using Rx.Net.StateMachine.Tests.Entities;
+﻿using Rx.Net.StateMachine.EntityFramework.Tables;
+using Rx.Net.StateMachine.Tests.Entities;
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;

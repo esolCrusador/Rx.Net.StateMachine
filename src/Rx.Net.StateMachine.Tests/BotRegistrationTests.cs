@@ -1,24 +1,14 @@
 ﻿using FluentAssertions;
-using FluentAssertions.Common;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Rx.Net.StateMachine.EntityFramework;
-using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.ObservableExtensions;
-using Rx.Net.StateMachine.Persistance;
-using Rx.Net.StateMachine.Tests.DataAccess;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
+using Rx.Net.StateMachine.Tests.Testing;
 using Rx.Net.StateMachine.WorkflowFactories;
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Reactive.Linq;
-using System.Reactive.Subjects;
-using System.Reactive.Threading.Tasks;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Xunit;
@@ -35,41 +25,20 @@ namespace Rx.Net.StateMachine.Tests
     public abstract class BotRegistrationTests : IAsyncLifetime
     {
         private readonly long _botId = new Random().NextInt64(long.MaxValue);
-        private readonly ServiceProvider _services;
-        private WorkflowManager<UserContext> _workflowManager => _services.GetRequiredService<WorkflowManager<UserContext>>();
-        private ChatFake _chatFake => _services.GetRequiredService<ChatFake>();
-        private SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, int> _createContextFactory =>
-            _services.GetRequiredService<SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, int>>();
-        private UserContextRepository UserContextRepository => _services.GetRequiredService<UserContextRepository>();
+        private StateMachineTestContext _ctx;
 
-        private BotRegistrationTests(Func<TestSessionStateDbContext> createContext)
+        private BotRegistrationTests(StateMachineTestContextBuilder builder)
         {
-            var services = new ServiceCollection();
-            services.AddSingleton(createContext);
-            services.AddStateMachine<UserContext>();
-            services.AddWorkflowFactory<BotRegistrationWorkflowFactory>();
-            services.AddSingleton<ChatFake>();
-            services.AddEFStateMachine()
-                .WithContext<UserContext>()
-                .WithKey(uc => uc.ContextId)
-                .WithDbContext(createContext)
-                .WithUnitOfWork<TestEFSessionStateUnitOfWork>();
-            services.AddSingleton<UserContextRepository>();
-            services.AddSingleton(sp => sp.GetRequiredService<ChatFake>().AddMessageHandler(HandleUserMessage));
+            builder.AddWorkflow<BotRegistrationWorkflowFactory>();
+            builder.AddMessageHandler(HandleUserMessage);
 
-            _services = services.BuildServiceProvider();
-            _services.GetServices<HandlerRegistration>();
+            _ctx = builder.Build();
         }
 
         [Trait("Category", "Fast")]
         public class Fast : BotRegistrationTests
         {
-            public Fast() : this($"TestDatabase-{Guid.NewGuid()}")
-            {
-            }
-
-            private Fast(string databaseName) :
-                base(() => new TestSessionStateDbContext(new DbContextOptionsBuilder().UseInMemoryDatabase(databaseName).Options))
+            public Fast() : base(StateMachineTestContextBuilder.Fast())
             {
             }
         }
@@ -77,66 +46,53 @@ namespace Rx.Net.StateMachine.Tests
         [Trait("Category", "Slow")]
         public class Slow : BotRegistrationTests
         {
-            public Slow() : this($"TestDatabase-{Guid.NewGuid()}")
+            public Slow() : base(StateMachineTestContextBuilder.Slow())
             {
-
-            }
-
-            private Slow(string databaseName) :
-                base(() => new TestSessionStateDbContext(new DbContextOptionsBuilder()
-                    .UseSqlServer("Data Source =.; Integrated Security = True; TrustServerCertificate=True; Initial Catalog=TestDatabase;".Replace("TestDatabase", databaseName))
-                    .Options))
-            {
-
             }
         }
 
-        public async Task InitializeAsync()
+        public Task InitializeAsync()
         {
-            await using var context = _createContextFactory.Create();
-            await context.Database.EnsureCreatedAsync();
+            return _ctx.InititalizeAsync();
         }
 
         public async Task DisposeAsync()
         {
-            await using var context = _createContextFactory.Create();
-            await context.Database.EnsureDeletedAsync();
-
-            await _services.DisposeAsync();
+            await _ctx.DisposeAsync();
         }
 
         [Fact]
         public async Task Should_Return_User_Information()
         {
-            var chatId = await _chatFake.RegisterUser(new UserInfo
+            var chatId = await _ctx.Chat.RegisterUser(new UserInfo
             {
                 FirstName = "Boris",
                 LastName = "Sotsky",
                 Username = "esolCrusador"
             });
-            await _chatFake.SendUserMessage(_botId, chatId, "/Start");
+            await _ctx.Chat.SendUserMessage(_botId, chatId, "/Start");
 
-            var botMessages = _chatFake.ReadNewBotMessageTexts(_botId, chatId);
+            var botMessages = _ctx.Chat.ReadNewBotMessageTexts(_botId, chatId);
             botMessages.Should().BeEquivalentTo("Hello, please follow steps to pass registration process", "Please enter your first name");
 
-            await _chatFake.SendUserMessage(_botId, chatId, "Boris");
-            botMessages = _chatFake.ReadNewBotMessageTexts(_botId, chatId);
+            await _ctx.Chat.SendUserMessage(_botId, chatId, "Boris");
+            botMessages = _ctx.Chat.ReadNewBotMessageTexts(_botId, chatId);
             botMessages.Should().BeEquivalentTo("Please enter your last name");
 
-            await _chatFake.SendUserMessage(_botId, chatId, "Sotsky");
-            botMessages = _chatFake.ReadNewBotMessageTexts(_botId, chatId);
+            await _ctx.Chat.SendUserMessage(_botId, chatId, "Sotsky");
+            botMessages = _ctx.Chat.ReadNewBotMessageTexts(_botId, chatId);
             botMessages.Should().BeEquivalentTo("Please enter your birth date");
 
-            await _chatFake.SendUserMessage(_botId, chatId, new DateTime(1987, 6, 23).ToShortDateString());
-            botMessages = _chatFake.ReadNewBotMessageTexts(_botId, chatId);
+            await _ctx.Chat.SendUserMessage(_botId, chatId, new DateTime(1987, 6, 23).ToShortDateString());
+            botMessages = _ctx.Chat.ReadNewBotMessageTexts(_botId, chatId);
             var lastMessage = botMessages.Single();
-            var user = await UserContextRepository.GetUserContext(_botId, chatId);
+            var user = await _ctx.UserContextRepository.GetUserContext(_botId, chatId);
             lastMessage.Should().Contain(user.UserId.ToString());
             lastMessage.Should().Contain("Boris");
             lastMessage.Should().Contain("Sotsky");
             lastMessage.Should().Contain("1987");
 
-            var allMessages = _chatFake.ReadAllMessageTexts(_botId, chatId);
+            var allMessages = _ctx.Chat.ReadAllMessageTexts(_botId, chatId);
             allMessages.Count.Should().Be(2);
             allMessages.First().Should().Be("/Start");
             allMessages.Last().Should().ContainAll("You was successfuly registered", "Boris", "Sotsky", "1987");
@@ -145,30 +101,30 @@ namespace Rx.Net.StateMachine.Tests
         [Fact]
         public async Task Should_Ask_To_Reenter_FirstName_If_Not_Valid()
         {
-            var chatId = await _chatFake.RegisterUser(new UserInfo
+            var chatId = await _ctx.Chat.RegisterUser(new UserInfo
             {
                 FirstName = "Boris",
                 LastName = "Sotsky",
                 Username = "esolCrusador"
             });
-            await _chatFake.SendUserMessage(_botId, chatId, "/Start");
+            await _ctx.Chat.SendUserMessage(_botId, chatId, "/Start");
 
-            var botMessages = _chatFake.ReadNewBotMessageTexts(_botId, chatId);
+            var botMessages = _ctx.Chat.ReadNewBotMessageTexts(_botId, chatId);
             botMessages.Should().BeEquivalentTo("Hello, please follow steps to pass registration process", "Please enter your first name");
 
-            await _chatFake.SendUserMessage(_botId, chatId, "   ");
-            botMessages = _chatFake.ReadNewBotMessageTexts(_botId, chatId);
+            await _ctx.Chat.SendUserMessage(_botId, chatId, "   ");
+            botMessages = _ctx.Chat.ReadNewBotMessageTexts(_botId, chatId);
             botMessages.Should().BeEquivalentTo("Oops first name is not valid, please try again", "Please enter your first name");
 
-            await _chatFake.SendUserMessage(_botId, chatId, " ");
-            botMessages = _chatFake.ReadNewBotMessageTexts(_botId, chatId);
+            await _ctx.Chat.SendUserMessage(_botId, chatId, " ");
+            botMessages = _ctx.Chat.ReadNewBotMessageTexts(_botId, chatId);
             botMessages.Should().BeEquivalentTo("Oops first name is not valid, please try again", "Please enter your first name");
 
-            await _chatFake.SendUserMessage(_botId, chatId, "Boris");
-            botMessages = _chatFake.ReadNewBotMessageTexts(_botId, chatId);
+            await _ctx.Chat.SendUserMessage(_botId, chatId, "Boris");
+            botMessages = _ctx.Chat.ReadNewBotMessageTexts(_botId, chatId);
             botMessages.Should().BeEquivalentTo("Please enter your last name");
 
-            var allMessages = _chatFake.ReadAllMessageTexts(_botId, chatId);
+            var allMessages = _ctx.Chat.ReadAllMessageTexts(_botId, chatId);
             allMessages.Count.Should().Be(3);
             allMessages.First().Should().Be("/Start");
             allMessages.Skip(1).First().Should().Contain("Hello");
@@ -177,19 +133,19 @@ namespace Rx.Net.StateMachine.Tests
 
         private async Task HandleUserMessage(BotFrameworkMessage message)
         {
-            var userContext = await UserContextRepository.GetUserOrCreateContext(message.BotId, message.ChatId,
+            var userContext = await _ctx.UserContextRepository.GetUserOrCreateContext(message.BotId, message.ChatId,
                 message.UserInfo.Name,
                 message.UserInfo.Username ?? message.UserInfo.UserId.ToString()
             );
 
             if (string.Equals(message.Text, "/start", StringComparison.OrdinalIgnoreCase))
-                await _workflowManager.StartHandle(BotRegistrationWorkflowFactory.Id, userContext);
+                await _ctx.WorkflowManager.StartHandle(BotRegistrationWorkflowFactory.Id, userContext);
             else
-                await _workflowManager.HandleEvent(message);
+                await _ctx.WorkflowManager.HandleEvent(message);
         }
 
         // Workflow: https://www.figma.com/file/WPqeeRL8EjiH1rzXT1os7o/User-Registration-Case?node-id=0%3A1
-        class BotRegistrationWorkflowFactory : WorkflowFactory<UserModel>
+        class BotRegistrationWorkflowFactory : Workflow<UserModel>
         {
             ChatFake _botFake;
 
@@ -201,7 +157,11 @@ namespace Rx.Net.StateMachine.Tests
             public override IObservable<UserModel> GetResult(StateMachineScope scope)
             {
                 var ctx = scope.GetContext<UserContext>();
-                return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.BotId, ctx.ChatId, "Hello, please follow steps to pass registration process"))
+                return Observable.FromAsync(async () =>
+                {
+                    await scope.MakeDefault(true);
+                    return await _botFake.SendBotMessage(ctx.BotId, ctx.ChatId, "Hello, please follow steps to pass registration process");
+                })
                     .PersistMessageId(scope)
                     .Select(_ => new UserModel { Id = ctx.UserId })
                     .Persist(scope, "UserId")
@@ -235,7 +195,12 @@ namespace Rx.Net.StateMachine.Tests
                         return user;
                     })
                     .Concat()
-                    .DeleteMssages(scope, _botFake);
+                    .DeleteMssages(scope, _botFake)
+                    .FinallyAsync(async (isExecuted, el, ex) =>
+                    {
+                        if (isExecuted)
+                            await scope.MakeDefault(false);
+                    });
             }
 
             private IObservable<string> RequestStringInput(StateMachineScope scope, string displayName, string stateName, Func<string, ValidationResult> validate)
@@ -257,7 +222,7 @@ namespace Rx.Net.StateMachine.Tests
                                     .PersistMessageId(scope)
                                     .Persist(scope, $"Invalid{stateName}")
                                     .IncreaseRecoursionDepth(scope)
-                                    .Select(_ => GetFirstName(scope))
+                                    .Select(_ => RequestStringInput(scope, displayName, stateName, validate))
                                     .Concat();
                     }).Concat()
                     .DeleteMssages(scope, _botFake);

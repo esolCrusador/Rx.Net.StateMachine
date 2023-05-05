@@ -172,7 +172,7 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         public async Task ClickButton(BotFrameworkMessage message, string buttonValue, int handledTimes = 1)
         {
             var click = new BotFrameworkButtonClick { BotId = message.BotId, ChatId = message.ChatId, MessageId = message.MessageId, SelectedValue = buttonValue };
-            var handled = _buttonClickHandled.Tap(cl => Debugger.Break()).Where(cl => cl == click).Take(handledTimes).Timeout(TimeSpan.FromSeconds(10)).ToTask();
+            var handled = _buttonClickHandled.Where(cl => cl == click).Take(handledTimes).Timeout(TimeSpan.FromSeconds(10)).ToTask();
             _buttonClicks.OnNext(click);
 
             await handled;
