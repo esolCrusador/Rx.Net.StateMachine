@@ -17,7 +17,7 @@ namespace Rx.Net.StateMachine.States
         public Guid? SessionStateId { get; }
         public string WorkflowId { get; private set; }
         public int Counter { get; private set; }
-        public int IsDefault { get; private set; }
+        public bool IsDefault { get; private set; }
         public object Context { get; private set; }
         public IReadOnlyDictionary<string, SessionStateStep> Steps => _steps;
         public IReadOnlyDictionary<string, string> Items => _items;
@@ -30,7 +30,7 @@ namespace Rx.Net.StateMachine.States
         public SessionStateStatus Status { get; set; }
         public string? Result { get; set; }
 
-        public SessionState(Guid? sessionStateId, string workflowId, object context, int isDefault, int counter, Dictionary<string, SessionStateStep> steps, Dictionary<string, string> items, List<PastSessionEvent> pastEvents, List<SessionEventAwaiter> sessionEventAwaiter)
+        public SessionState(Guid? sessionStateId, string workflowId, object context, bool isDefault, int counter, Dictionary<string, SessionStateStep> steps, Dictionary<string, string> items, List<PastSessionEvent> pastEvents, List<SessionEventAwaiter> sessionEventAwaiter)
         {
             SessionStateId = sessionStateId;
             WorkflowId = workflowId;
@@ -44,7 +44,7 @@ namespace Rx.Net.StateMachine.States
             _sessionEventAwaiter = sessionEventAwaiter;
         }
 
-        public SessionState(string workflowId, object context) : this(null, workflowId, context, 0, 0, new Dictionary<string, SessionStateStep>(), new Dictionary<string, string>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
+        public SessionState(string workflowId, object context) : this(null, workflowId, context, false, 0, new Dictionary<string, SessionStateStep>(), new Dictionary<string, string>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
         {
             Status = SessionStateStatus.Created;
         }
@@ -175,10 +175,7 @@ namespace Rx.Net.StateMachine.States
 
         internal void MakeDefault(bool isDefault)
         {
-            if (isDefault)
-                IsDefault++;
-            else
-                IsDefault--;
+            IsDefault = isDefault;
         }
 
         internal void RemoveEventAwaiters(string prefix)

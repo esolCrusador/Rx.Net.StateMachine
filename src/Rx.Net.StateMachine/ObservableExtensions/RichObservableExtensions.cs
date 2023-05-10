@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
@@ -27,10 +28,14 @@ namespace Rx.Net.StateMachine.ObservableExtensions
             return source.Select(s => result);
         }
 
-        public static IObservable<TResult> WhenAny<TSource, TResult>(this IObservable<TSource> source, StateMachineScope scope, string name, params Func<TSource, StateMachineScope, IObservable<TResult>>[] observables)
+        public static IObservable<TResult> WhenAny<TSource, TResult>(this IObservable<TSource> source, StateMachineScope scope, string name, params Func<TSource, StateMachineScope, IObservable<TResult>?>[] observables)
         {
             var whenAnyScope = scope.BeginScope(name);
-            return source.Select(s => Observable.Merge(observables.Select(obs => obs(s, whenAnyScope)))).Concat().Take(1)
+            return source.Select(s =>
+            {
+                var results = observables.Select(obs => obs(s, whenAnyScope)).Where(obs => obs != null) as IEnumerable<IObservable<TResult>>;
+                return Observable.Merge(results);
+            }).Concat().Take(1)
                 .TapAsync(() => whenAnyScope.RemoveScopeAwaiters());
         }
     }

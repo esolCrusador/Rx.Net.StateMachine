@@ -110,7 +110,8 @@ namespace Rx.Net.StateMachine.Tests.DataAccess
                 TaskId = taskId,
                 CommentId = commentEntity.CommentId,
                 Text = comment,
-                Context = eventContext
+                Context = eventContext,
+                UserId = userId
             });
 
             return new CommentModel { CommentId = commentEntity.CommentId, Text = commentEntity.Text, UserId = commentEntity.UserId };

@@ -9,7 +9,7 @@ namespace Rx.Net.StateMachine.Persistance.Entities
         public Guid SessionStateId { get; set; }
         public string WorkflowId { get; set; }
         public int Counter { get; set; }
-        public int IsDefault { get; set; }
+        public bool IsDefault { get; set; }
         public List<SessionStepEntity> Steps { get; set; }
         public List<SessionItemEntity> Items { get; set; }
         public List<SessionEventEntity> PastEvents { get; set; }

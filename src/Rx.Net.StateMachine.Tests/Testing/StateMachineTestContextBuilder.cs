@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Rx.Net.StateMachine.EntityFramework;
 using Rx.Net.StateMachine.Persistance;
+using Rx.Net.StateMachine.Tests.Controls;
 using Rx.Net.StateMachine.Tests.DataAccess;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
@@ -64,6 +65,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
             services.AddSingleton<ChatFake>();
             services.AddSingleton<MessageQueue>();
             services.AddSingleton<FakeScheduler>();
+            services.AddControls();
 
             services.AddEFStateMachine()
                 .WithContext<UserContext>()

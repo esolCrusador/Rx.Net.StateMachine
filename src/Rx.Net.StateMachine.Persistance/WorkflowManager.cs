@@ -1,4 +1,5 @@
-﻿using Rx.Net.StateMachine.Persistance.Entities;
+﻿using Rx.Net.StateMachine.Events;
+using Rx.Net.StateMachine.Persistance.Entities;
 using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Storage;
 using Rx.Net.StateMachine.WorkflowFactories;
@@ -46,6 +47,11 @@ namespace Rx.Net.StateMachine.Persistance
             var sessionState = ToSessionState(newSessionStateEntity);
 
             return await StartHandleSessionState(source, newSessionStateEntity, sessionState, context, uof);
+        }
+
+        public async Task RemoveDefaultSesssions(Guid? newDefaultSessionId, string userContextId)
+        {
+            await HandleEvent(new DefaultSessionRemoved { SessionId = newDefaultSessionId, UserContextId = userContextId });
         }
 
         public async Task<List<HandlingResult>> HandleEvent<TEvent>(TEvent @event)

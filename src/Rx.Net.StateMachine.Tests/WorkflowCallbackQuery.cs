@@ -8,10 +8,12 @@ namespace Rx.Net.StateMachine.Tests
 {
     public class WorkflowCallbackQuery
     {
+        private Dictionary<string, string>? _parameters;
+
         public string? WorkflowFactoryId { get; set; }
         public Guid? SessionId { get; set; }
         public string? Command { get; set; }
-        public Dictionary<string, string>? Parameters { get; set; }
+        public Dictionary<string, string> Parameters { get => _parameters ??= new Dictionary<string, string>(); set => _parameters = value; }
 
         public override string ToString()
         {
@@ -31,11 +33,11 @@ namespace Rx.Net.StateMachine.Tests
                 result.Append($"c:{Command}");
             }
 
-            if (Parameters?.Count > 0)
+            if (_parameters?.Count > 0)
             {
                 if (result.Length > 0)
                     result.Append(',');
-                result.Append($"p:{string.Join(";", Parameters.Select(kvp => $"{kvp.Key}:{kvp.Value}"))}");
+                result.Append($"p:{string.Join(";", _parameters.Select(kvp => $"{kvp.Key}:{kvp.Value}"))}");
             }
 
             if (result.Length > 100)

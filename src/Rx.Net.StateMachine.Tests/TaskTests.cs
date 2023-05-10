@@ -18,11 +18,13 @@ using Xunit;
 using Rx.Net.StateMachine.Tests.Events;
 using Rx.Net.StateMachine.Tests.Extensions;
 using System.Diagnostics;
+using Rx.Net.StateMachine.Events;
+using Rx.Net.StateMachine.Tests.Controls;
 
 namespace Rx.Net.StateMachine.Tests
 {
     // https://www.figma.com/file/65UWsCMvohKGerVrUWWFdd/Task-Workflow?type=whiteboard&node-id=0-1&t=HtMQYV7kgZbTx2GO-0
-    public abstract class TaskTests : IAsyncLifetime
+    public abstract partial class TaskTests : IAsyncLifetime
     {
         private readonly StateMachineTestContext _ctx;
         private readonly long _botId = new Random().NextInt64(long.MaxValue);
@@ -35,6 +37,7 @@ namespace Rx.Net.StateMachine.Tests
                 .AddClickHandler(HandleButtonClick)
                 .AddEventHandler<TaskCreatedEvent>(HandleEvent)
                 .AddEventHandler<TaskStateChanged>(HandleEvent)
+                .AddEventHandler<TaskCommentAdded>(HandleEvent)
                 .AddEventHandler<TimeoutEvent>(HandleEvent)
                 .AddWorkflow<OnboardingWorkflow>()
                 .AddWorkflow<CuratorWorkflow>()
@@ -106,6 +109,34 @@ namespace Rx.Net.StateMachine.Tests
             var taskMessage = await StartFirstTask();
             await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.First().Key);
 
+            var requestCommentMessage = _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
+            requestCommentMessage.Text.Should().Be("Please send message to this chat");
+            await _ctx.Chat.SendUserMessage(_botId, _studentId, "Result");
+
+            var updatedMessage = _ctx.Chat.ReadMessage(_botId, _studentId, taskMessage.MessageId);
+            updatedMessage!.Buttons!.First().Value.Should().Be("☑️");
+            taskMessage.Text.Should().Be(updatedMessage.Text);
+            taskMessage.Buttons.Should().NotBeEquivalentTo(updatedMessage.Buttons);
+        }
+
+        [Fact]
+        public async Task Should_Add_Comment_On_Changing_Task_Status()
+        {
+            var taskMessage = await StartFirstTask();
+            await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.First().Key);
+
+            var requestComment = _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
+            requestComment.Text.Should().Be("Please send message to this chat");
+
+            await _ctx.Chat.SendUserMessage(
+                _botId,
+                _studentId,
+                "Here is my result:  https://www.figma.com/file/65UWsCMvohKGerVrUWWFdd/Task-Workflow?type=whiteboard&node-id=0-1&t=HtMQYV7kgZbTx2GO-0"
+            );
+            var commentMessage = _ctx.Chat.ReadNewBotMessageTexts(_botId, _studentId).Single();
+            commentMessage.Should().Contain("Boris");
+            commentMessage.Should().Contain("Here is my result:");
+
             var updatedMessage = _ctx.Chat.ReadMessage(_botId, _studentId, taskMessage.MessageId);
             updatedMessage!.Buttons!.First().Value.Should().Be("☑️");
             taskMessage.Text.Should().Be(updatedMessage.Text);
@@ -116,14 +147,35 @@ namespace Rx.Net.StateMachine.Tests
         public async Task Should_Update_Task_Status_Twice()
         {
             var taskMessage = await StartFirstTask();
+
+            await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.Last().Key);
+            await _ctx.Chat.SendUserMessage(_botId, _studentId, "Some comment");
+            _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
+
             await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.First().Key);
+            var confirmationMessage = _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single(); // Not add comment
+            await _ctx.Chat.ClickButton(confirmationMessage, confirmationMessage.Buttons!.Last().Key);
 
             var updatedMessage = _ctx.Chat.ReadMessage(_botId, _studentId, taskMessage.MessageId);
             updatedMessage!.Buttons!.First().Value.Should().Be("☑️");
 
             await _ctx.Chat.ClickButton(updatedMessage, updatedMessage.Buttons!.First().Key);
+            confirmationMessage = _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single(); // Not add comment
+            await _ctx.Chat.ClickButton(confirmationMessage, confirmationMessage.Buttons!.Last().Key);
+
             var updatedMessage2 = _ctx.Chat.ReadMessage(_botId, _studentId, taskMessage.MessageId);
             updatedMessage2!.Buttons!.First().Value.Should().NotBe(updatedMessage.Buttons!.First().Value);
+        }
+
+        [Fact]
+        public async Task Should_Hide_Task_Buttons_When_Confirmation_Is_Shown()
+        {
+            var taskMessage = await StartFirstTask();
+
+            await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.First().Key);
+
+            var updatedMessage = _ctx.Chat.ReadMessage(_botId, _studentId, taskMessage.MessageId);
+            updatedMessage!.Buttons.Should().BeNull();
         }
 
         [Fact]
@@ -157,6 +209,80 @@ namespace Rx.Net.StateMachine.Tests
             _ctx.Chat.ReadMessage(_botId, _studentId, message.MessageId).Should().BeNull();
         }
 
+        [Fact]
+        public async Task Should_Hide_Comment_Dialog_On_Cancel()
+        {
+            var taskMessage = await StartFirstTask();
+            await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.Last().Key);
+
+            var message = _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
+            message.Text.Should().Be("Please send message to this chat");
+
+            await _ctx.Chat.SendUserMessage(_botId, _studentId, "/cancel");
+            _ctx.Chat.ReadMessage(_botId, _studentId, message.MessageId).Should().BeNull();
+        }
+
+        [Fact]
+        public async Task Should_Show_Confirmed_Task_To_Curator()
+        {
+            await AddCurator();
+
+            await SubmitFirtTask("Here is my result: https://wisk.pro");
+
+            var curatorMessages = _ctx.Chat.ReadNewBotMessages(_botId, _curatorId);
+            curatorMessages.Should().HaveCount(2);
+
+            curatorMessages.First().Text.Should().Be("*First Task*\r\nDescription");
+            curatorMessages.Last().Text.Should().Contain("Boris Sotsky");
+            curatorMessages.Last().Text.Should().Contain("Here is my result: https://wisk.pro");
+        }
+
+        [Fact]
+        public async Task Should_Not_Show_Confirmed_Task_To_Curator_If_Comment_Was_Not_Added()
+        {
+            await AddCurator();
+
+            await SubmitFirtTask(null);
+
+            var curatorMessages = _ctx.Chat.ReadNewBotMessages(_botId, _curatorId);
+            curatorMessages.Should().HaveCount(0);
+        }
+
+        [Fact]
+        public async Task Should_Show_Confirmed_Task_To_Curator_If_Comment_Was_Added_Later()
+        {
+            await AddCurator();
+
+            var studentTaskMessage = await SubmitFirtTask(null);
+            var requestComment = _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
+            requestComment.Text.Should().Be("Please send message to this chat");
+
+            var curatorMessages = _ctx.Chat.ReadNewBotMessages(_botId, _curatorId);
+            curatorMessages.Should().HaveCount(0);
+
+            await _ctx.Chat.SendUserMessage(_botId, _studentId, "Result");
+
+            curatorMessages = _ctx.Chat.ReadNewBotMessages(_botId, _curatorId);
+            curatorMessages.Should().HaveCount(2);
+        }
+
+        [Fact]
+        public async Task Should_Show_Comments_From_Curator()
+        {
+            await AddCurator();
+
+            var studentTaskMessage = await SubmitFirtTask("Result");
+
+            var messages = _ctx.Chat.ReadNewBotMessages(_botId, _curatorId);
+
+            var taskMessage = messages.First();
+            await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.Last().Key);
+
+            await _ctx.Chat.SendUserMessage(_botId, _curatorId, "Well done!");
+
+            var reply = _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
+        }
+
         private async Task<IReadOnlyCollection<BotFrameworkMessage>> AddCurator()
         {
             await _ctx.Chat.SendUserMessage(_botId, _curatorId, "/curator");
@@ -174,6 +300,29 @@ namespace Rx.Net.StateMachine.Tests
             return _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
         }
 
+        private async Task<BotFrameworkMessage> SubmitFirtTask(string? resultText)
+        {
+            var taskMessage = await StartFirstTask();
+
+            if (resultText != null)
+            {
+                await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.Last().Key); // Comment
+                _ctx.Chat.ReadNewBotMessages(_botId, _studentId);
+
+                await _ctx.Chat.SendUserMessage(_botId, _studentId, resultText);
+                _ctx.Chat.ReadNewBotMessages(_botId, _studentId); // Comment
+            }
+
+            await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.First().Key); // Submit
+            if(resultText != null)
+            {
+                var confirmation = _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
+                await _ctx.Chat.ClickButton(confirmation, confirmation.Buttons!.Last().Value);
+            }
+
+            return taskMessage;
+        }
+
         private async Task HandleUserMessage(BotFrameworkMessage message)
         {
             var userContext = await _ctx.UserContextRepository.GetUserOrCreateContext(message.BotId, message.ChatId,
@@ -185,6 +334,8 @@ namespace Rx.Net.StateMachine.Tests
                 await _ctx.WorkflowManager.StartHandle(OnboardingWorkflow.Id, userContext);
             else if (string.Equals(message.Text, "/curator", StringComparison.OrdinalIgnoreCase))
                 await _ctx.WorkflowManager.StartHandle(CuratorWorkflow.Id, userContext);
+            else if (string.Equals(message.Text, "/cancel", StringComparison.OrdinalIgnoreCase))
+                await _ctx.WorkflowManager.RemoveDefaultSesssions(null, userContext.ContextId.ToString());
             else
                 await _ctx.WorkflowManager.HandleEvent(message);
         }
@@ -254,7 +405,8 @@ namespace Rx.Net.StateMachine.Tests
                 var context = scope.GetContext<UserContext>();
                 return Observable.FromAsync(() => _chat.SendBotMessage(context.BotId, context.ChatId, "All new tasks will be sent to you"))
                     .Persist(scope, "WelcomeMessage")
-                    .Select(_ => HandleNewTask(scope))
+                    .SelectAsync(async _ => HandleNewTask(await scope.BeginRecursiveScope("TaskCreatedLoop")))
+                    .Concat()
                     .Concat();
             }
 
@@ -273,36 +425,73 @@ namespace Rx.Net.StateMachine.Tests
         {
             public const string Id = nameof(CuratorTaskWorkflow);
             private readonly WorkflowManagerAccessor<UserContext> _workflowManagerAccessor;
+            private readonly TaskRepository _taskRepository;
 
             public override string WorkflowId => Id;
 
-            public CuratorTaskWorkflow(WorkflowManagerAccessor<UserContext> workflowManagerAccessor)
+            public CuratorTaskWorkflow(WorkflowManagerAccessor<UserContext> workflowManagerAccessor, TaskRepository taskRepository)
             {
                 _workflowManagerAccessor = workflowManagerAccessor;
+                _taskRepository = taskRepository;
             }
 
             public override IObservable<Unit> GetResult(IObservable<int> input, StateMachineScope scope)
             {
                 return input.Persist(scope, "TaskCreated")
-                    .StopAndWait().For<TaskStateChanged>(scope, "StateChange", (tsc, taskId) => tsc.TaskId == taskId && tsc.State == TaskState.ReadyForReview)
+                    .SelectAsync(async taskId => WhenTaskReady(taskId, await scope.BeginRecursiveScope("TaskReady")))
+                    .Concat()
+                    .Concat()
                     .SelectAsync(tc => _workflowManagerAccessor.WorkflowManager.StartHandle(tc.TaskId, TaskWorkflow.Id, scope.GetContext<UserContext>()))
+                    .Concat()
                     .MapToVoid();
+            }
+
+            private IObservable<TaskModel> WhenTaskReady(int taskId, StateMachineScope scope)
+            {
+                return StateMachineObservableExtensions.Of(taskId).WhenAny(
+                    scope,
+                    "TaskReady",
+                    (taskId, innerScope) => innerScope.StopAndWait<TaskStateChanged>("StateChange", (tsc) =>
+                    {
+                        return tsc.TaskId == taskId && tsc.State == TaskState.ReadyForReview;
+                    }).MapTo(taskId),
+                    (taskId, innerScope) => innerScope.StopAndWait<TaskCommentAdded>("CommentAdded", (ta) =>
+                    {
+                        return ta.TaskId == taskId;
+                    }).MapTo(taskId)
+                ).SelectAsync(_taskRepository.GetTask)
+                .Concat()
+                .Select(task =>
+                {
+                    if (task.State == TaskState.ReadyForReview && task.Comments.Count > 0)
+                        return StateMachineObservableExtensions.Of(task);
+
+                    return StateMachineObservableExtensions.Of(task.TaskId)
+                        .Persist(scope, "TaskNotReady")
+                        .IncreaseRecoursionDepth(scope)
+                        .Select(taskId => WhenTaskReady(taskId, scope))
+                        .Concat();
+                })
+                .Concat();
             }
         }
 
-        class TaskWorkflow : Workflow<int, Unit>
+        partial class TaskWorkflow : Workflow<int, Unit>
         {
             private readonly TaskRepository _taskRepository;
-            private readonly UserContextRepository _userContextRepository;
             private readonly ChatFake _chat;
-            private readonly FakeScheduler _scheduler;
+            private readonly RequestCommentControl _requestComment;
+            private readonly ShowCommentControl _showCommentControl;
+            private readonly ConfirmationControl _confirmationControl;
 
-            public TaskWorkflow(TaskRepository taskRepository, UserContextRepository userContextRepository, ChatFake chatFake, FakeScheduler scheduler)
+            public TaskWorkflow(TaskRepository taskRepository, ChatFake chatFake,
+                RequestCommentControl requestComment, ShowCommentControl showCommentControl, ConfirmationControl confirmationControl)
             {
                 _taskRepository = taskRepository;
-                _userContextRepository = userContextRepository;
                 _chat = chatFake;
-                _scheduler = scheduler;
+                _requestComment = requestComment;
+                _showCommentControl = showCommentControl;
+                _confirmationControl = confirmationControl;
             }
 
             public const string Id = nameof(TaskWorkflow);
@@ -339,97 +528,68 @@ namespace Rx.Net.StateMachine.Tests
                                                 {
                                                     ["SessionId"] = scope.SessionId.ToString("n")
                                                 })
-                                           );
+                                           ).Persist(scope, "StateUpdated")
+                                           .Select(task =>
+                                           {
+                                               return UpdateTask(taskMessageContext.MessageId, task, scope, false)
+                                                .MapTo(task);
+                                           })
+                                           .Concat()
+                                           .Persist(scope, "RemovedTaskButtons")
+                                           .Select(task =>
+                                           {
+                                               return (task.Comments.Count != 0 ? _confirmationControl.StartDialog(
+                                                                                                  scope.BeginScope("ConfirmComment"),
+                                                                                                  new DialogConfiguration("Do you want to add comment with result?")
+                                                                                               )
+                                               : StateMachineObservableExtensions.Of(true))
+                                                .Select(addComment =>
+                                                {
+                                                    if (addComment)
+                                                        return _requestComment.StartDialog(scope.BeginScope("FinalComment"), taskMessageContext, task.Comments.Count == 0);
+
+                                                    return StateMachineObservableExtensions.Of(Unit.Default);
+                                                }).Concat()
+                                                .Select(_ => UpdateTask(taskMessageContext.MessageId, task, scope, true))
+                                                .Concat();
+                                           }).Concat();
                                         }
                                     case "c":
                                         {
-                                            return AddComment(taskMessageContext, scope.BeginScope($"Comment"));
+                                            return _requestComment.StartDialog(scope.BeginScope("Comment"), taskMessageContext, false);
                                         }
                                     default:
                                         throw new NotSupportedException($"Not supported command {query.Command} workflow {scope.SessionId}");
                                 };
                             }).Concat();
+                    },
+                    innerScope =>
+                    {
+                        return innerScope.StopAndWait<TaskCommentAdded>("CommentAdded", tca => tca.TaskId == taskMessageContext.TaskId)
+                            .SelectAsync(comment => _showCommentControl.ShowComment(innerScope.GetContext<UserContext>(), new CommentModel
+                            {
+                                CommentId = comment.CommentId,
+                                Text = comment.Text,
+                                UserId = comment.UserId
+                            }, taskMessageContext.MessageId)
+                        ).Concat().MapToVoid();
                     }
-                ).Select(task => UpdateTask(taskMessageContext.MessageId, task, scope))
-                .Concat()
-                .Persist(scope, "TaskUpdated")
+                )
                 .IncreaseRecoursionDepth(scope)
                 .Select(_ => HandleTask(taskMessageContext, scope))
                 .Concat()
                 .MapToVoid();
             }
 
-            private IObservable<TaskModel?> AddComment(TaskMessageContext taskMessageContext, StateMachineScope scope)
-            {
-                var userContext = scope.GetContext<UserContext>();
-
-                return Observable.FromAsync(async () =>
-                {
-                    await scope.MakeDefault(true);
-
-                    return await _chat.SendBotMessage(userContext.BotId, userContext.ChatId, "Please send message to this chat");
-                })
-                .Persist(scope, "CommentRequested")
-                .PersistMessageId(scope)
-                .WhenAny(
-                    scope,
-                    "UserMessageOrTimeout",
-                    (messageId, innerScope) =>
-                        innerScope.StopAndWait<BotFrameworkMessage>("UserMessage")
-                        .SelectAsync(async message =>
-                        {
-                            var comment = await _taskRepository.AddComment(
-                                taskMessageContext.TaskId,
-                                userContext.UserId,
-                                message.Text,
-                                new Dictionary<string, string> { ["SessionId"] = innerScope.SessionId.ToString("n") }
-                            );
-
-                            await _chat.DeleteUserMessage(userContext.BotId, userContext.ChatId, message.MessageId);
-                            await ShowComment(userContext, comment, taskMessageContext.MessageId);
-                        })
-                        .Concat(),
-                    (messageId, innerScope) =>
-                        Observable.FromAsync(async () =>
-                        {
-                            var timeout = new TimeoutEvent
-                            {
-                                EventId = Guid.NewGuid(),
-                                SessionId = innerScope.SessionId
-                            };
-                            await _scheduler.ScheduleEvent(timeout, TimeSpan.FromMinutes(5));
-                            return timeout.EventId;
-                        })
-                        .Persist(scope, "TimeoutAdded")
-                        .StopAndWait().For<TimeoutEvent>(innerScope, "Timeout", (timeout, eventId) =>
-                        {
-                            return timeout.EventId == eventId;
-                        })
-                        .MapToVoid()
-                )
-                .FinallyAsync(async (isExecuted, el, ex) =>
-                {
-                    if (isExecuted)
-                        await scope.MakeDefault(false);
-                })
-                .DeleteMssages(scope, _chat)
-                .Take(1)
-                .MapTo((TaskModel?)null);
-            }
-
-            class TaskMessageContext
-            {
-                public int TaskId { get; set; }
-                public int MessageId { get; set; }
-            }
-
-            private IObservable<Unit> UpdateTask(int messageId, TaskModel? task, StateMachineScope scope)
+            private IObservable<Unit> UpdateTask(int messageId, TaskModel? task, StateMachineScope scope, bool showButtons)
             {
                 return Observable.FromAsync(async () =>
                 {
                     var userContext = scope.GetContext<UserContext>();
                     if (task != null)
-                        await _chat.UpdateBotMessage(userContext.BotId, userContext.ChatId, messageId, GetTaskMessage(scope, task), GetButtons(scope, task).ToArray());
+                        await _chat.UpdateBotMessage(userContext.BotId, userContext.ChatId, messageId, GetTaskMessage(scope, task),
+                           showButtons ? GetButtons(scope, task).ToArray() : new KeyValuePair<string, string>[0]
+                        );
                 });
             }
 
@@ -449,7 +609,7 @@ namespace Rx.Net.StateMachine.Tests
                         );
 
                         foreach (var c in task.Comments)
-                            await ShowComment(context, c, messageId);
+                            await _showCommentControl.ShowComment(context, c, messageId);
 
                         return new TaskMessageContext { TaskId = taskId, MessageId = messageId };
                     })
@@ -498,18 +658,6 @@ namespace Rx.Net.StateMachine.Tests
                     TaskState.Approved => "✅",
                     _ => throw new NotSupportedException($"Not supported {nameof(TaskState)}.{task.State}")
                 };
-            }
-
-            private async Task<int> ShowComment(UserContext userContext, CommentModel comment, int taskMessageId)
-            {
-                var user = await _userContextRepository.GetUserContext(comment.UserId)
-                    ?? throw new Exception("User not found");
-                return await _chat.SendBotMessage(
-                    userContext.BotId,
-                    userContext.ChatId,
-                    $"({user.Name})[tg://user/{user.ChatId}]:\r\n{comment.Text}",
-                    taskMessageId
-                );
             }
         }
     }

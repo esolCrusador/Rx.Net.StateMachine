@@ -83,7 +83,7 @@ namespace Rx.Net.StateMachine
                 null,
                 minimalSessionState.WorkflowId, 
                 context, 
-                0,
+                false,
                 minimalSessionState.Counter, 
                 minimalSessionState.Steps ?? new Dictionary<string, SessionStateStep>(), 
                 minimalSessionState.Items ?? new Dictionary<string, string>(), 
