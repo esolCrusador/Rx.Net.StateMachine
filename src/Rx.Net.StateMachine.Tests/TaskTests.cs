@@ -16,9 +16,6 @@ using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Xunit;
 using Rx.Net.StateMachine.Tests.Events;
-using Rx.Net.StateMachine.Tests.Extensions;
-using System.Diagnostics;
-using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Tests.Controls;
 using Rx.Net.StateMachine.Tests.Awaiters;
 
@@ -230,12 +227,15 @@ namespace Rx.Net.StateMachine.Tests
 
             await SubmitFirtTask("Here is my result: https://wisk.pro");
 
-            var curatorMessages = _ctx.Chat.ReadNewBotMessages(_botId, _curatorId);
-            curatorMessages.Should().HaveCount(2);
+            await _ctx.AsyncWait.For(() =>
+            {
+                var curatorMessages = _ctx.Chat.ReadNewBotMessages(_botId, _curatorId);
+                curatorMessages.Should().HaveCount(2);
 
-            curatorMessages.First().Text.Should().Be("*First Task*\r\nDescription");
-            curatorMessages.Last().Text.Should().Contain("Boris Sotsky");
-            curatorMessages.Last().Text.Should().Contain("Here is my result: https://wisk.pro");
+                curatorMessages.First().Text.Should().Be("*First Task*\r\nDescription");
+                curatorMessages.Last().Text.Should().Contain("Boris Sotsky");
+                curatorMessages.Last().Text.Should().Contain("Here is my result: https://wisk.pro");
+            });
         }
 
         [Fact]
@@ -263,8 +263,11 @@ namespace Rx.Net.StateMachine.Tests
 
             await _ctx.Chat.SendUserMessage(_botId, _studentId, "Result");
 
-            curatorMessages = _ctx.Chat.ReadNewBotMessages(_botId, _curatorId);
-            curatorMessages.Should().HaveCount(2);
+            await _ctx.AsyncWait.For(() =>
+            {
+                curatorMessages = _ctx.Chat.ReadNewBotMessages(_botId, _curatorId);
+                curatorMessages.Should().HaveCount(2);
+            });
         }
 
         [Fact]
@@ -281,7 +284,10 @@ namespace Rx.Net.StateMachine.Tests
 
             await _ctx.Chat.SendUserMessage(_botId, _curatorId, "Well done!");
 
-            var reply = _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
+            await _ctx.AsyncWait.For(() =>
+            {
+                var reply = _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
+            });
         }
 
         private async Task<IReadOnlyCollection<BotFrameworkMessage>> AddCurator()
@@ -308,10 +314,10 @@ namespace Rx.Net.StateMachine.Tests
             if (resultText != null)
             {
                 await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.Last().Key); // Comment
-                _ctx.Chat.ReadNewBotMessages(_botId, _studentId);
+                _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
 
                 await _ctx.Chat.SendUserMessage(_botId, _studentId, resultText);
-                _ctx.Chat.ReadNewBotMessages(_botId, _studentId); // Comment
+                _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single(); // Comment
             }
 
             await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.First().Key); // Submit

@@ -162,7 +162,7 @@ namespace Rx.Net.StateMachine.Tests.Fakes
             int messageId = GetNextBotMessageId(botId, chatId);
             var message = new BotFrameworkMessage(messageId, botId, chatId, MessageSource.User, messageText, _users[chatId]);
             messages.Add(message);
-            var handled = _userMessageHandled.Where(m => m == message).Take(handledCount).Timeout(TimeSpan.FromSeconds(10)).ToTask();
+            var handled = _userMessageHandled.Where(m => m == message).Take(handledCount).Timeout(Debugger.IsAttached ? TimeSpan.FromSeconds(1000) : TimeSpan.FromSeconds(10)).ToTask();
             _userMessages.OnNext(message);
             await handled;
 
@@ -172,7 +172,7 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         public async Task ClickButton(BotFrameworkMessage message, string buttonValue, int handledTimes = 1)
         {
             var click = new BotFrameworkButtonClick { BotId = message.BotId, ChatId = message.ChatId, MessageId = message.MessageId, SelectedValue = buttonValue };
-            var handled = _buttonClickHandled.Where(cl => cl == click).Take(handledTimes).Timeout(TimeSpan.FromSeconds(10)).ToTask();
+            var handled = _buttonClickHandled.Where(cl => cl == click).Take(handledTimes).Timeout(Debugger.IsAttached ? TimeSpan.FromSeconds(1000) : TimeSpan.FromSeconds(10)).ToTask();
             _buttonClicks.OnNext(click);
 
             await handled;

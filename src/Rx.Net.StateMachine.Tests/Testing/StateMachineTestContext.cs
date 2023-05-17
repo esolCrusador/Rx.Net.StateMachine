@@ -22,6 +22,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
         public StateMachine StateMachine => _services.GetRequiredService<StateMachine>();
         public IWorkflowResolver WorkflowResolver => _services.GetRequiredService<IWorkflowResolver>();
         public FakeScheduler Scheduler => _services.GetRequiredService<FakeScheduler>();
+        public AsyncWait AsyncWait => _services.GetRequiredService<AsyncWait>();
 
         public StateMachineTestContext(ServiceProvider serviceProvider) =>
             _services = serviceProvider;
