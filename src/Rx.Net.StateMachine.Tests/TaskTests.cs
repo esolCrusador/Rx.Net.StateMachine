@@ -20,6 +20,7 @@ using Rx.Net.StateMachine.Tests.Extensions;
 using System.Diagnostics;
 using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Tests.Controls;
+using Rx.Net.StateMachine.Tests.Awaiters;
 
 namespace Rx.Net.StateMachine.Tests
 {
@@ -57,7 +58,7 @@ namespace Rx.Net.StateMachine.Tests
         [Trait("Category", "Slow")]
         public class Slow : TaskTests
         {
-            public Slow() : base(StateMachineTestContextBuilder.Fast())
+            public Slow() : base(StateMachineTestContextBuilder.Slow())
             {
             }
         }
@@ -374,7 +375,7 @@ namespace Rx.Net.StateMachine.Tests
                     var context = scope.GetContext<UserContext>();
                     return await _chat.SendButtonsBotMessage(context.BotId, context.ChatId, "Hi", new KeyValuePair<string, string>("Hi", "Hi"));
                 }).Persist(scope, "WelcomeMessage")
-                .StopAndWait().For<BotFrameworkButtonClick>(scope, "Hi", (click, messageId) => click.MessageId == messageId)
+                .StopAndWait().For<BotFrameworkButtonClick>(scope, "Hi", messageId => new BotFrameworkButtonClickAwaiter(messageId))
                 .SelectAsync(async () =>
                 {
                     var context = scope.GetContext<UserContext>();
@@ -412,7 +413,7 @@ namespace Rx.Net.StateMachine.Tests
 
             private IObservable<Unit> HandleNewTask(StateMachineScope scope)
             {
-                return scope.StopAndWait<TaskCreatedEvent>("TaskCreated")
+                return scope.StopAndWait<TaskCreatedEvent>("TaskCreated", TaskCreatedEventAwaiter.Default)
                     .SelectAsync(tc => _workflowManagerAccessor.WorkflowManager.StartHandle(tc.TaskId, CuratorTaskWorkflow.Id, scope.GetContext<UserContext>()))
                     .Concat()
                     .IncreaseRecoursionDepth(scope)
@@ -451,11 +452,11 @@ namespace Rx.Net.StateMachine.Tests
                 return StateMachineObservableExtensions.Of(taskId).WhenAny(
                     scope,
                     "TaskReady",
-                    (taskId, innerScope) => innerScope.StopAndWait<TaskStateChanged>("StateChange", (tsc) =>
+                    (taskId, innerScope) => innerScope.StopAndWait<TaskStateChanged>("StateChange", new TaskStateChangedAwaiter(taskId), (tsc) =>
                     {
                         return tsc.TaskId == taskId && tsc.State == TaskState.ReadyForReview;
                     }).MapTo(taskId),
-                    (taskId, innerScope) => innerScope.StopAndWait<TaskCommentAdded>("CommentAdded", (ta) =>
+                    (taskId, innerScope) => innerScope.StopAndWait<TaskCommentAdded>("CommentAdded", new TaskCommentAddedAwaiter(taskId), (ta) =>
                     {
                         return ta.TaskId == taskId;
                     }).MapTo(taskId)
@@ -512,7 +513,7 @@ namespace Rx.Net.StateMachine.Tests
                     "TaskEvents",
                     innerScope =>
                     {
-                        return innerScope.StopAndWait<BotFrameworkButtonClick>("Click")
+                        return innerScope.StopAndWait<BotFrameworkButtonClick>("Click", new BotFrameworkButtonClickAwaiter(taskMessageContext.MessageId))
                             .Select(click =>
                             {
                                 var query = WorkflowCallbackQuery.Parse(click.SelectedValue);
@@ -565,7 +566,7 @@ namespace Rx.Net.StateMachine.Tests
                     },
                     innerScope =>
                     {
-                        return innerScope.StopAndWait<TaskCommentAdded>("CommentAdded", tca => tca.TaskId == taskMessageContext.TaskId)
+                        return innerScope.StopAndWait<TaskCommentAdded>("CommentAdded", new TaskCommentAddedAwaiter(taskMessageContext.TaskId))
                             .SelectAsync(comment => _showCommentControl.ShowComment(innerScope.GetContext<UserContext>(), new CommentModel
                             {
                                 CommentId = comment.CommentId,

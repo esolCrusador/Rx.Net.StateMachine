@@ -15,6 +15,7 @@ using FluentAssertions;
 using Rx.Net.StateMachine.Tests.Events;
 using Rx.Net.StateMachine.EntityFramework.Tables;
 using Microsoft.EntityFrameworkCore;
+using Rx.Net.StateMachine.Tests.Awaiters;
 
 namespace Rx.Net.StateMachine.Tests
 {
@@ -146,8 +147,8 @@ namespace Rx.Net.StateMachine.Tests
                             await _scheduler.ScheduleEvent(ev, TimeSpan.FromSeconds(30));
 
                             return ev.EventId;
-                        }).Persist(anyScope, "Timeout1").StopAndWait().For<TimeoutEvent>(anyScope, "FirstTimeoutEvent", (te, eventId) => te.EventId == eventId).MapToVoid(),
-                       (messageId, anyScope) => anyScope.StopAndWait<BotFrameworkButtonClick>("HiButton").MapToVoid()
+                        }).Persist(anyScope, "Timeout1").StopAndWait().For<TimeoutEvent>(anyScope, "FirstTimeoutEvent", eventId => new TimeoutEventAwaiter(eventId)).MapToVoid(),
+                       (messageId, anyScope) => anyScope.StopAndWait<BotFrameworkButtonClick>("HiButton", new BotFrameworkButtonClickAwaiter(messageId)).MapToVoid()
                     )
                     .SelectAsync(() => _chat.SendBotMessage(userContext.BotId, userContext.ChatId, "Well Done!"))
                     .Concat()

@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using Rx.Net.StateMachine.ObservableExtensions;
+using Rx.Net.StateMachine.Tests.Awaiters;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
@@ -209,7 +210,7 @@ namespace Rx.Net.StateMachine.Tests
                 return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.BotId, ctx.ChatId, $"Please enter your {displayName}"))
                     .PersistMessageId(scope)
                     .Persist(scope, $"Ask{stateName}")
-                    .StopAndWait().For<BotFrameworkMessage>(scope, "MessageReceived")
+                    .StopAndWait().For<BotFrameworkMessage>(scope, "MessageReceived", BotFrameworkMessageAwaiter.Default)
                     .PersistMessageId(scope)
                     .Select(message =>
                     {

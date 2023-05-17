@@ -13,10 +13,10 @@ namespace Rx.Net.StateMachine.Tests.Entities
         public string Description { get; set; }
         public TaskState State { get; set; }
         public Guid AssigneeId { get; set; }
-        public Guid SupervisorId { get; set; }
+        public Guid? SupervisorId { get; set; }
 
         public ICollection<TaskCommentEntity> Comments { get; set; }
         [ForeignKey(nameof(AssigneeId))] public UserEntity Assignee { get; set; }
-        [ForeignKey(nameof(SupervisorId))] public UserEntity Supervisor { get; set; }
+        [ForeignKey(nameof(SupervisorId))] public UserEntity? Supervisor { get; set; }
     }
 }

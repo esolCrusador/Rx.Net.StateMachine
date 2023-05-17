@@ -1,4 +1,5 @@
-﻿using Rx.Net.StateMachine.Exceptions;
+﻿using Rx.Net.StateMachine.Events;
+using Rx.Net.StateMachine.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -144,10 +145,10 @@ namespace Rx.Net.StateMachine.States
             _events.Add(se);
         }
 
-        internal bool AddEvent<TEvent>(TEvent @event)
+        internal bool AddEvent<TEvent>(TEvent @event, IEnumerable<IEventAwaiter<TEvent>> eventAwaiters)
         {
-            var eventTypeId = @event.GetType().GUID;
-            var awaiters = _sessionEventAwaiter.Where(e => e.Type.GUID == eventTypeId).ToArray();
+            var awaiterIds = eventAwaiters.Select(ea => ea.AwaiterId).ToHashSet();
+            var awaiters = _sessionEventAwaiter.Where(e => awaiterIds.Contains(e.Identifier)).ToArray();
             if (awaiters.Length == 0)
                 return false;
 
@@ -167,10 +168,10 @@ namespace Rx.Net.StateMachine.States
             return result;
         }
 
-        internal void AddEventAwaiter<TEvent>(string stateId)
+        internal void AddEventAwaiter<TEvent>(string stateId, IEventAwaiter<TEvent> eventAwaiter)
         {
             if (!_sessionEventAwaiter.Any(aw => aw.Name == stateId))
-                _sessionEventAwaiter.Add(new SessionEventAwaiter(typeof(TEvent), stateId, GetSequenceNumber()));
+                _sessionEventAwaiter.Add(new SessionEventAwaiter(stateId, eventAwaiter, GetSequenceNumber()));
         }
 
         internal void MakeDefault(bool isDefault)

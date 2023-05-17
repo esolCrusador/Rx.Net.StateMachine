@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Persistance;
+using Rx.Net.StateMachine.Tests.Awaiters;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
@@ -197,7 +198,7 @@ namespace Rx.Net.StateMachine.Tests
                                     new KeyValuePair<string, string>("Delete", $"s:{currentState}-d")
                                 );
                         }).PersistBeforePrevious(scope, "InitialDialog")
-                        .StopAndWait().For<BotFrameworkButtonClick>(scope, "InitialButtonClock")
+                        .StopAndWait().For<BotFrameworkButtonClick>(scope, "InitialButtonClock", messageId => new BotFrameworkButtonClickAwaiter(messageId))
                         .SelectAsync(async buttonClick =>
                         {
                             string selectedValue = buttonClick.SelectedValue.Substring(buttonClick.SelectedValue.LastIndexOf('-') + 1);
@@ -267,7 +268,7 @@ namespace Rx.Net.StateMachine.Tests
                     .Persist(scope, "ChangeNameConfirmation")
                     .PersistMessageId(scope)
                     .Select(messageId =>
-                        scope.StopAndWait<BotFrameworkButtonClick>("ChangeNameConfirmationWait")
+                        scope.StopAndWait<BotFrameworkButtonClick>("ChangeNameConfirmationWait", new BotFrameworkButtonClickAwaiter(messageId))
                         .Select(click => click.SelectedValue == "yes")
                         .FinallyAsync(async (isExecuted, _, ex) =>
                         {
@@ -299,7 +300,7 @@ namespace Rx.Net.StateMachine.Tests
                             _botFake.SendBotMessage(context.BotId, context.ChatId, "Please enter name"))
                                 .PersistMessageId(scope)
                                 .Select(messageId =>
-                                    scope.StopAndWait<BotFrameworkMessage>("NameInput")
+                                    scope.StopAndWait<BotFrameworkMessage>("NameInput", BotFrameworkMessageAwaiter.Default)
                                     .Select(nameInput =>
                                     {
                                         if (string.IsNullOrEmpty(nameInput.Text))

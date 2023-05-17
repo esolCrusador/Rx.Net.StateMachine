@@ -1,4 +1,5 @@
-﻿using Rx.Net.StateMachine.Exceptions;
+﻿using Rx.Net.StateMachine.Events;
+using Rx.Net.StateMachine.Exceptions;
 using Rx.Net.StateMachine.Extensions;
 using Rx.Net.StateMachine.Helpers;
 using Rx.Net.StateMachine.States;
@@ -116,9 +117,9 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
-        public Task AddEvent<TEvent>(TEvent @event)
+        public Task AddEvent<TEvent>(TEvent @event, IEnumerable<IEventAwaiter<TEvent>> eventAwaiters)
         {
-            SessionState.AddEvent<TEvent>(@event);
+            SessionState.AddEvent<TEvent>(@event, eventAwaiters);
 
             return SessionStateStorage.PersistEventState(SessionState);
         }
@@ -130,9 +131,9 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistEventState(SessionState);
         }
 
-        public Task AddEventAwaiter<TEvent>(string stateId)
+        public Task AddEventAwaiter<TEvent>(string stateId, IEventAwaiter<TEvent> eventAwaiter)
         {
-            SessionState.AddEventAwaiter<TEvent>(AddPrefix(stateId));
+            SessionState.AddEventAwaiter<TEvent>(AddPrefix(stateId), eventAwaiter);
 
             return SessionStateStorage.PersistEventAwaiter(SessionState);
         }

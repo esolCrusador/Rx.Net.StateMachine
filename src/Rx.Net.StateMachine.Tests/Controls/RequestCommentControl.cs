@@ -12,6 +12,7 @@ using Rx.Net.StateMachine.Tests.Events;
 using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Tests.DataAccess;
 using System.Reactive;
+using Rx.Net.StateMachine.Tests.Awaiters;
 
 namespace Rx.Net.StateMachine.Tests.Controls
 {
@@ -49,7 +50,7 @@ namespace Rx.Net.StateMachine.Tests.Controls
                 scope,
                 "UserMessageOrTimeout",
                 (messageId, innerScope) =>
-                    innerScope.StopAndWait<BotFrameworkMessage>("UserMessage")
+                    innerScope.StopAndWait<BotFrameworkMessage>("UserMessage", BotFrameworkMessageAwaiter.Default)
                     .SelectAsync(async message =>
                     {
                         var comment = await _taskRepository.AddComment(
@@ -78,14 +79,11 @@ namespace Rx.Net.StateMachine.Tests.Controls
                                             return timeout.EventId;
                                         })
                                         .Persist(scope, "TimeoutAdded")
-                                        .StopAndWait().For<TimeoutEvent>(innerScope, "Timeout", (timeout, eventId) =>
-                                        {
-                                            return timeout.EventId == eventId;
-                                        })
+                                        .StopAndWait().For<TimeoutEvent>(innerScope, "Timeout", to => new TimeoutEventAwaiter(to))
                                         .MapToVoid();
                 },
                 (messageId, innerScope) =>
-                    scope.StopAndWait<DefaultSessionRemoved>("DefaultSessionRemoved")
+                    scope.StopAndWait<DefaultSessionRemoved>("DefaultSessionRemoved", DefaultSessionRemovedAwaiter.Default)
                     .MapToVoid()
             )
             .FinallyAsync(async (isExecuted, el, ex) =>

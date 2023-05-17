@@ -1,9 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Rx.Net.StateMachine.EntityFramework.Awaiters;
 using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.EntityFramework.Extensions;
 using Rx.Net.StateMachine.EntityFramework.Tables;
 using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
 using Rx.Net.StateMachine.EntityFramework.UnitOfWork;
+using Rx.Net.StateMachine.Extensions;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Persistance.Entities;
 using Rx.Net.StateMachine.States;
@@ -33,6 +35,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         private readonly Dictionary<Guid, SessionStateData> _loadedSessionStates;
         private SessionStateDbContext<TContext, TContextKey>? _sessionStateContext;
         private ContextKeySelector<TContext, TContextKey>? _contextKeySelector;
+        private AwaitHandlerResolver<TContext, TContextKey>? _eventAwaiterResolver;
 
         protected internal SessionStateDbContext<TContext, TContextKey> SessionStateDbContext
         {
@@ -43,6 +46,12 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         {
             get => _contextKeySelector ?? throw new ArgumentException($"{nameof(ContextKeySelector)} is not initialized");
             set => _contextKeySelector = value;
+        }
+
+        protected internal AwaitHandlerResolver<TContext, TContextKey> EventAwaiterResolver
+        {
+            get => _eventAwaiterResolver ?? throw new ArgumentException($"{nameof(EventAwaiterResolver)} is not initialized");
+            set => _eventAwaiterResolver = value;
         }
 
         public EFSessionStateUnitOfWork()
@@ -67,17 +76,26 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 
         public async Task<IReadOnlyCollection<SessionStateEntity>> GetSessionStates(object @event)
         {
+            var awaitHandler = EventAwaiterResolver.GetAwaiterHandler(@event.GetType());
+
             var sessions = await SessionStateDbContext.SessionStates
                 .Include(ss => ss.Context)
                 .Include(ss => ss.Awaiters)
-                .Where(GetFilter(@event))
                 .Where(ss => ss.Status == SessionStateStatus.InProgress)
+                .Where(awaitHandler.GetSessionStateFilter(@event))
+                .Where(GetAwaitersFilter(awaitHandler, @event))
                 .ToListAsync();
 
             return MapToSessionStates(sessions);
         }
 
-        protected abstract Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> GetFilter(object @event);
+        private Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> GetAwaitersFilter(IAwaiterHandler<TContext, TContextKey> awaiterHandler, object @event)
+        {
+            var awaiterIdentifiers = awaiterHandler.GetAwaiterIdTypes()
+                .Select(at => AwaiterExtensions.CreateAwaiter(at, @event).AwaiterId).ToList();
+
+            return ss => ss.Awaiters.Any(aw => awaiterIdentifiers.Contains(aw.Identifier));
+        }
 
         public void Dispose() => SessionStateDbContext.Dispose();
 
@@ -108,7 +126,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 AwaiterId = aw.AwaiterId,
                 SequenceNumber = aw.SequenceNumber,
                 Name = aw.Name,
-                TypeName = aw.TypeName,
+                Identifier = aw.Identifier,
             }).ToList();
 
             dest.Status = source.Status;
@@ -141,7 +159,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                         SessionStateId = source.SessionStateId,
                         SequenceNumber = aw.SequenceNumber,
                         Name = aw.Name,
-                        TypeName = aw.TypeName,
+                        Identifier = aw.Identifier,
                         ContextId = dest.ContextId
                     };
                     SessionStateDbContext.Add(awaiter);

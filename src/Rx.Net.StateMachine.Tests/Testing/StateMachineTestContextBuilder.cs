@@ -1,13 +1,18 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Rx.Net.StateMachine.EntityFramework;
+using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Persistance;
+using Rx.Net.StateMachine.Tests.Awaiters;
 using Rx.Net.StateMachine.Tests.Controls;
 using Rx.Net.StateMachine.Tests.DataAccess;
+using Rx.Net.StateMachine.Tests.Events;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
 using Rx.Net.StateMachine.WorkflowFactories;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.Tests.Testing
@@ -70,6 +75,41 @@ namespace Rx.Net.StateMachine.Tests.Testing
             services.AddEFStateMachine()
                 .WithContext<UserContext>()
                 .WithKey(uc => uc.ContextId)
+                .AddAwaiterHandler<BotFrameworkMessage>(c => c
+                    .WithContextFilter(ev => ss => ss.Context.BotId == ev.BotId && ss.Context.ChatId == ev.ChatId && ss.IsDefault)
+                    .WithAwaiter<BotFrameworkMessageAwaiter>()
+                )
+                .AddAwaiterHandler<BotFrameworkButtonClick>(c => c
+                    .WithContextFilter(ev =>
+                    {
+                        if (WorkflowCallbackQuery.TryParse(ev.SelectedValue, out var query))
+                        {
+                            if (query.SessionId != null)
+                                return ss => ss.SessionStateId == query.SessionId.Value;
+                        }
+
+                        return ss => true;
+                    })
+                    .WithAwaiter<BotFrameworkButtonClickAwaiter>()
+                )
+                .AddAwaiterHandler<TaskCreatedEvent>(c => c.WithAwaiter<TaskCreatedEventAwaiter>())
+                .AddAwaiterHandler<TaskStateChanged>(c => c.WithAwaiter<TaskStateChangedAwaiter>())
+                .AddAwaiterHandler<TimeoutEvent>(c => c.WithAwaiter<TimeoutEventAwaiter>())
+                .AddAwaiterHandler<TaskCommentAdded>(c => c.WithContextFilter(ev =>
+                {
+                    var sessionIdString = ev.Context?.GetValueOrDefault("SessionId");
+                    if (sessionIdString != null)
+                    {
+                        var sessionId = Guid.Parse(sessionIdString);
+                        return ss => ss.SessionStateId != sessionId;
+                    }
+                    return ss => true;
+                }).WithAwaiter<TaskCommentAddedAwaiter>())
+                .AddAwaiterHandler<DefaultSessionRemoved>(c => c.WithContextFilter(ev =>
+                {
+                    var contextId = int.Parse(ev.UserContextId);
+                    return ss => ss.IsDefault && ss.ContextId == contextId && ss.SessionStateId != ev.SessionId;
+                }).WithAwaiter<DefaultSessionRemovedAwaiter>())
                 .WithDbContext(createContext)
                 .WithUnitOfWork<TestEFSessionStateUnitOfWork>();
             services.AddSingleton<UserContextRepository>();

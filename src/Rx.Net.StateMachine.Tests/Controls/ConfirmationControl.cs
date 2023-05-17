@@ -1,4 +1,5 @@
 ﻿using Rx.Net.StateMachine.ObservableExtensions;
+using Rx.Net.StateMachine.Tests.Awaiters;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
@@ -49,7 +50,7 @@ namespace Rx.Net.StateMachine.Tests.Controls
             ))
             .PersistMessageId(scope)
             .Persist(scope, "ConfirmButtonAdded")
-            .StopAndWait().For<BotFrameworkButtonClick>(scope, "ConfirmButton", bc =>
+            .StopAndWait().For<BotFrameworkButtonClick>(scope, "ConfirmButton", messageId => new BotFrameworkButtonClickAwaiter(messageId), bc =>
             {
                 var query = WorkflowCallbackQuery.Parse(bc.SelectedValue);
                 return query.Command == "confirm";

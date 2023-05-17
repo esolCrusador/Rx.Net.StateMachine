@@ -15,13 +15,15 @@ namespace Rx.Net.StateMachine.Persistance
     {
         private readonly ISessionStateUnitOfWorkFactory _uofFactory;
         private readonly IWorkflowResolver _workflowResolver;
+        private readonly IEventAwaiterResolver _eventAwaiterResolver;
 
         public StateMachine StateMachine { get; }
 
-        public WorkflowManager(ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, StateMachine stateMachine)
+        public WorkflowManager(ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, IEventAwaiterResolver eventAwaiterResolver, StateMachine stateMachine)
         {
             _uofFactory = uofFactory;
             _workflowResolver = workflowResolver;
+            _eventAwaiterResolver = eventAwaiterResolver;
             StateMachine = stateMachine;
         }
 
@@ -60,7 +62,6 @@ namespace Rx.Net.StateMachine.Persistance
                 throw new ArgumentNullException(nameof(@event));
 
             await using var uof = _uofFactory.Create();
-            var eventType = SessionEventAwaiter.GetTypeName(@event.GetType());
 
             var sessionStates = await uof.GetSessionStates(@event);
 
@@ -97,7 +98,7 @@ namespace Rx.Net.StateMachine.Persistance
         private async Task<HandlingResult> HandleSessionStateEvent<TEvent>(SessionStateEntity sessionStateEntity, TEvent @event, ISessionStateUnitOfWork uof)
         {
             var sessionState = ToSessionState(sessionStateEntity);
-            bool isAdded = StateMachine.AddEvent(sessionState, @event);
+            bool isAdded = StateMachine.AddEvent(sessionState, @event, _eventAwaiterResolver.GetEventAwaiters(@event));
             if (!isAdded && sessionState.Status != SessionStateStatus.Created)
                 return HandlingResult.Ignored;
 
@@ -139,7 +140,7 @@ namespace Rx.Net.StateMachine.Persistance
                 entity.Steps.ToDictionary(s => s.Id, s => new SessionStateStep(s.State, s.SequenceNumber)),
                 entity.Items.ToDictionary(i => i.Id, i => i.Value),
                 MapSessionEvents(entity.PastEvents),
-                entity.Awaiters.Select(aw => new SessionEventAwaiter(aw.AwaiterId, aw.Name, aw.TypeName, aw.SequenceNumber)).ToList()
+                entity.Awaiters.Select(aw => new SessionEventAwaiter(aw.AwaiterId, aw.Name, aw.Identifier, aw.SequenceNumber)).ToList()
             )
             {
                 Status = entity.Status,
@@ -169,7 +170,7 @@ namespace Rx.Net.StateMachine.Persistance
             {
                 AwaiterId = aw.AwaiterId,
                 Name = aw.Name,
-                TypeName = aw.TypeName,
+                Identifier = aw.Identifier,
                 SequenceNumber = aw.SequenceNumber
             }).ToList();
             dest.Counter = state.Counter;

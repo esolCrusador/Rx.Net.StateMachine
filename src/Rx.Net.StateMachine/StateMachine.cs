@@ -1,4 +1,5 @@
-﻿using Rx.Net.StateMachine.Helpers;
+﻿using Rx.Net.StateMachine.Events;
+using Rx.Net.StateMachine.Helpers;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Storage;
@@ -16,7 +17,7 @@ namespace Rx.Net.StateMachine
     {
         public JsonSerializerOptions SerializerOptions { get; }
 
-        public StateMachine(): this(new JsonSerializerOptions())
+        public StateMachine() : this(new JsonSerializerOptions())
         {
         }
 
@@ -25,9 +26,9 @@ namespace Rx.Net.StateMachine
             SerializerOptions = serializerOptions;
         }
 
-        public bool AddEvent<TEvent>(SessionState sessionState, TEvent @event)
+        public bool AddEvent<TEvent>(SessionState sessionState, TEvent @event, IEnumerable<IEventAwaiter<TEvent>> eventAwaiters)
         {
-            return sessionState.AddEvent(@event);
+            return sessionState.AddEvent(@event, eventAwaiters);
         }
 
         public void ForceAddEvent<TEvent>(SessionState sessionState, TEvent @event)
@@ -81,13 +82,13 @@ namespace Rx.Net.StateMachine
 
             return new SessionState(
                 null,
-                minimalSessionState.WorkflowId, 
-                context, 
+                minimalSessionState.WorkflowId,
+                context,
                 false,
-                minimalSessionState.Counter, 
-                minimalSessionState.Steps ?? new Dictionary<string, SessionStateStep>(), 
-                minimalSessionState.Items ?? new Dictionary<string, string>(), 
-                new List<PastSessionEvent>(), 
+                minimalSessionState.Counter,
+                minimalSessionState.Steps ?? new Dictionary<string, SessionStateStep>(),
+                minimalSessionState.Items ?? new Dictionary<string, string>(),
+                new List<PastSessionEvent>(),
                 new List<SessionEventAwaiter>()
             );
         }
