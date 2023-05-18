@@ -39,6 +39,7 @@ namespace Rx.Net.StateMachine.EntityFramework.ContextDfinition
                     .WithMany()
                     .HasForeignKey(aw => aw.ContextId);
                 builder.HasIndex(aw => new { aw.SessionStateId, aw.Name }).IsUnique();
+                builder.HasIndex(aw => new { aw.IsActive, aw.Identifier }).HasFilter("[IsActive] = 1");
             });
         }
     }

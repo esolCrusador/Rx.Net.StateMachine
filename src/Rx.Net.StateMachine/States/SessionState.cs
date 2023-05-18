@@ -47,7 +47,7 @@ namespace Rx.Net.StateMachine.States
 
         public SessionState(string workflowId, object context) : this(null, workflowId, context, false, 0, new Dictionary<string, SessionStateStep>(), new Dictionary<string, string>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
         {
-            Status = SessionStateStatus.Created;
+            Status = SessionStateStatus.InProgress;
         }
 
         internal bool TryGetStep<TSource>(string stateId, JsonSerializerOptions options, out TSource source)

@@ -50,7 +50,7 @@ namespace Rx.Net.StateMachine.Tests.Controls
             ))
             .PersistMessageId(scope)
             .Persist(scope, "ConfirmButtonAdded")
-            .StopAndWait().For<BotFrameworkButtonClick>(scope, "ConfirmButton", messageId => new BotFrameworkButtonClickAwaiter(messageId), bc =>
+            .StopAndWait().For<BotFrameworkButtonClick>(scope, "ConfirmButton", messageId => new BotFrameworkButtonClickAwaiter(userContext, messageId), bc =>
             {
                 var query = WorkflowCallbackQuery.Parse(bc.SelectedValue);
                 return query.Command == "confirm";

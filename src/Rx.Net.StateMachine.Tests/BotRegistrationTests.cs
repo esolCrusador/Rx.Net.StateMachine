@@ -210,7 +210,7 @@ namespace Rx.Net.StateMachine.Tests
                 return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.BotId, ctx.ChatId, $"Please enter your {displayName}"))
                     .PersistMessageId(scope)
                     .Persist(scope, $"Ask{stateName}")
-                    .StopAndWait().For<BotFrameworkMessage>(scope, "MessageReceived", BotFrameworkMessageAwaiter.Default)
+                    .StopAndWait().For<BotFrameworkMessage>(scope, "MessageReceived", new BotFrameworkMessageAwaiter(ctx))
                     .PersistMessageId(scope)
                     .Select(message =>
                     {

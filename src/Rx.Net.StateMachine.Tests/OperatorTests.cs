@@ -148,7 +148,7 @@ namespace Rx.Net.StateMachine.Tests
 
                             return ev.EventId;
                         }).Persist(anyScope, "Timeout1").StopAndWait().For<TimeoutEvent>(anyScope, "FirstTimeoutEvent", eventId => new TimeoutEventAwaiter(eventId)).MapToVoid(),
-                       (messageId, anyScope) => anyScope.StopAndWait<BotFrameworkButtonClick>("HiButton", new BotFrameworkButtonClickAwaiter(messageId)).MapToVoid()
+                       (messageId, anyScope) => anyScope.StopAndWait<BotFrameworkButtonClick>("HiButton", new BotFrameworkButtonClickAwaiter(userContext, messageId)).MapToVoid()
                     )
                     .SelectAsync(() => _chat.SendBotMessage(userContext.BotId, userContext.ChatId, "Well Done!"))
                     .Concat()

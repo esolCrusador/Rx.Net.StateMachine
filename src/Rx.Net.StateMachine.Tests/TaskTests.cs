@@ -376,12 +376,12 @@ namespace Rx.Net.StateMachine.Tests
 
             public override IObservable<Unit> GetResult(IObservable<Unit> input, StateMachineScope scope)
             {
+                var context = scope.GetContext<UserContext>();
                 return Observable.FromAsync(async () =>
                 {
-                    var context = scope.GetContext<UserContext>();
                     return await _chat.SendButtonsBotMessage(context.BotId, context.ChatId, "Hi", new KeyValuePair<string, string>("Hi", "Hi"));
                 }).Persist(scope, "WelcomeMessage")
-                .StopAndWait().For<BotFrameworkButtonClick>(scope, "Hi", messageId => new BotFrameworkButtonClickAwaiter(messageId))
+                .StopAndWait().For<BotFrameworkButtonClick>(scope, "Hi", messageId => new BotFrameworkButtonClickAwaiter(context, messageId))
                 .SelectAsync(async () =>
                 {
                     var context = scope.GetContext<UserContext>();
@@ -519,7 +519,8 @@ namespace Rx.Net.StateMachine.Tests
                     "TaskEvents",
                     innerScope =>
                     {
-                        return innerScope.StopAndWait<BotFrameworkButtonClick>("Click", new BotFrameworkButtonClickAwaiter(taskMessageContext.MessageId))
+                        var userContext = scope.GetContext<UserContext>();
+                        return innerScope.StopAndWait<BotFrameworkButtonClick>("Click", new BotFrameworkButtonClickAwaiter(userContext, taskMessageContext.MessageId))
                             .Select(click =>
                             {
                                 var query = WorkflowCallbackQuery.Parse(click.SelectedValue);

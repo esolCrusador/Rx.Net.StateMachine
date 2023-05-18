@@ -198,7 +198,7 @@ namespace Rx.Net.StateMachine.Tests
                                     new KeyValuePair<string, string>("Delete", $"s:{currentState}-d")
                                 );
                         }).PersistBeforePrevious(scope, "InitialDialog")
-                        .StopAndWait().For<BotFrameworkButtonClick>(scope, "InitialButtonClock", messageId => new BotFrameworkButtonClickAwaiter(messageId))
+                        .StopAndWait().For<BotFrameworkButtonClick>(scope, "InitialButtonClock", messageId => new BotFrameworkButtonClickAwaiter(context, messageId))
                         .SelectAsync(async buttonClick =>
                         {
                             string selectedValue = buttonClick.SelectedValue.Substring(buttonClick.SelectedValue.LastIndexOf('-') + 1);
@@ -268,7 +268,7 @@ namespace Rx.Net.StateMachine.Tests
                     .Persist(scope, "ChangeNameConfirmation")
                     .PersistMessageId(scope)
                     .Select(messageId =>
-                        scope.StopAndWait<BotFrameworkButtonClick>("ChangeNameConfirmationWait", new BotFrameworkButtonClickAwaiter(messageId))
+                        scope.StopAndWait<BotFrameworkButtonClick>("ChangeNameConfirmationWait", new BotFrameworkButtonClickAwaiter(context, messageId))
                         .Select(click => click.SelectedValue == "yes")
                         .FinallyAsync(async (isExecuted, _, ex) =>
                         {
@@ -300,7 +300,7 @@ namespace Rx.Net.StateMachine.Tests
                             _botFake.SendBotMessage(context.BotId, context.ChatId, "Please enter name"))
                                 .PersistMessageId(scope)
                                 .Select(messageId =>
-                                    scope.StopAndWait<BotFrameworkMessage>("NameInput", BotFrameworkMessageAwaiter.Default)
+                                    scope.StopAndWait<BotFrameworkMessage>("NameInput", new BotFrameworkMessageAwaiter(context))
                                     .Select(nameInput =>
                                     {
                                         if (string.IsNullOrEmpty(nameInput.Text))
