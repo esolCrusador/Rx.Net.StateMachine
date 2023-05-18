@@ -1,4 +1,5 @@
-﻿using Rx.Net.StateMachine.Exceptions;
+﻿using Rx.Net.StateMachine.Events;
+using Rx.Net.StateMachine.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,8 +15,10 @@ namespace Rx.Net.StateMachine.States
         private readonly List<SessionEvent> _events;
         private readonly List<SessionEventAwaiter> _sessionEventAwaiter;
 
+        public Guid? SessionStateId { get; }
         public string WorkflowId { get; private set; }
         public int Counter { get; private set; }
+        public bool IsDefault { get; private set; }
         public object Context { get; private set; }
         public IReadOnlyDictionary<string, SessionStateStep> Steps => _steps;
         public IReadOnlyDictionary<string, string> Items => _items;
@@ -26,12 +29,14 @@ namespace Rx.Net.StateMachine.States
         public bool Changed { get; private set; } = false;
 
         public SessionStateStatus Status { get; set; }
-        public string Result { get; set; }
+        public string? Result { get; set; }
 
-        public SessionState(string workflowId, object context, int counter, Dictionary<string, SessionStateStep> steps, Dictionary<string, string> items, List<PastSessionEvent> pastEvents, List<SessionEventAwaiter> sessionEventAwaiter)
+        public SessionState(Guid? sessionStateId, string workflowId, object context, bool isDefault, int counter, Dictionary<string, SessionStateStep> steps, Dictionary<string, string> items, List<PastSessionEvent> pastEvents, List<SessionEventAwaiter> sessionEventAwaiter)
         {
+            SessionStateId = sessionStateId;
             WorkflowId = workflowId;
             Context = context;
+            IsDefault = isDefault;
             Counter = counter;
             _steps = steps;
             _items = items;
@@ -40,7 +45,7 @@ namespace Rx.Net.StateMachine.States
             _sessionEventAwaiter = sessionEventAwaiter;
         }
 
-        public SessionState(string workflowId, object context) : this(workflowId, context, 0, new Dictionary<string, SessionStateStep>(), new Dictionary<string, string>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
+        public SessionState(string workflowId, object context) : this(null, workflowId, context, false, 0, new Dictionary<string, SessionStateStep>(), new Dictionary<string, string>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
         {
             Status = SessionStateStatus.Created;
         }
@@ -119,7 +124,8 @@ namespace Rx.Net.StateMachine.States
             return true;
         }
 
-        internal TItem GetItem<TItem>(string itemId, JsonSerializerOptions options){
+        internal TItem GetItem<TItem>(string itemId, JsonSerializerOptions options)
+        {
             if (!TryGetItem<TItem>(itemId, options, out var item))
                 throw new ItemNotFoundException(itemId);
 
@@ -139,10 +145,10 @@ namespace Rx.Net.StateMachine.States
             _events.Add(se);
         }
 
-        internal bool AddEvent<TEvent>(TEvent @event)
+        internal bool AddEvent<TEvent>(TEvent @event, IEnumerable<IEventAwaiter<TEvent>> eventAwaiters)
         {
-            var eventTypeId = @event.GetType().GUID;
-            var awaiters = _sessionEventAwaiter.Where(e => e.Type.GUID == eventTypeId).ToArray();
+            var awaiterIds = eventAwaiters.Select(ea => ea.AwaiterId).ToHashSet();
+            var awaiters = _sessionEventAwaiter.Where(e => awaiterIds.Contains(e.Identifier)).ToArray();
             if (awaiters.Length == 0)
                 return false;
 
@@ -162,9 +168,20 @@ namespace Rx.Net.StateMachine.States
             return result;
         }
 
-        internal void AddEventAwaiter<TEvent>()
+        internal void AddEventAwaiter<TEvent>(string stateId, IEventAwaiter<TEvent> eventAwaiter)
         {
-            _sessionEventAwaiter.Add(new SessionEventAwaiter(typeof(TEvent), GetSequenceNumber()));
+            if (!_sessionEventAwaiter.Any(aw => aw.Name == stateId))
+                _sessionEventAwaiter.Add(new SessionEventAwaiter(stateId, eventAwaiter, GetSequenceNumber()));
+        }
+
+        internal void MakeDefault(bool isDefault)
+        {
+            IsDefault = isDefault;
+        }
+
+        internal void RemoveEventAwaiters(string prefix)
+        {
+            _sessionEventAwaiter.RemoveAll(aw => aw.Name.StartsWith(prefix));
         }
 
         internal void MarkEventAsHandled<TEvent>(TEvent @event, JsonSerializerOptions options)

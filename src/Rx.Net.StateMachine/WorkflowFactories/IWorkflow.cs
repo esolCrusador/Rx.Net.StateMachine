@@ -3,18 +3,18 @@ using System.Reactive;
 
 namespace Rx.Net.StateMachine.WorkflowFactories
 {
-    public interface IWorkflowFactory
+    public interface IWorkflow
     {
         string WorkflowId { get; }
         IObservable<Unit> Execute(StateMachineScope scope);
     }
 
-    public interface IWorkflowFactory<TResult>: IWorkflowFactory
+    public interface IWorkflow<TResult>: IWorkflow
     {
         IObservable<TResult> GetResult(StateMachineScope scope);
     }
 
-    public interface IWorkflowFactory<TSource, TResult>: IWorkflowFactory<TResult>
+    public interface IWorkflow<TSource, TResult>: IWorkflow<TResult>
     {
         IObservable<TResult> GetResult(IObservable<TSource> input, StateMachineScope scope);
     }

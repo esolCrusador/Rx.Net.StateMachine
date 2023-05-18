@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Rx.Net.StateMachine.Events;
+using System;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
@@ -46,15 +47,22 @@ namespace Rx.Net.StateMachine.ObservableExtensions
         public static StopAndWaitFactory<TSource> StopAndWait<TSource>(this IObservable<TSource> source) =>
             new StopAndWaitFactory<TSource>(source);
 
-        public static IObservable<TEvent> StopAndWait<TEvent>(this StateMachineScope scope, string stateId, Func<TEvent, bool> matches = null)
+        public static IObservable<TEvent> StopAndWait<TEvent>(this StateMachineScope scope, string stateId, IEventAwaiter<TEvent> eventAwaiter, Func<TEvent, bool> matches = null)
         {
-            return StopAndWait<TEvent>(scope, matches).Persist(scope, stateId);
+            return WaitOrHandle<TEvent>(scope, stateId, eventAwaiter, matches).Persist(scope, stateId);
+        }
+
+        public static IObservable<TResult> WhenAny<TResult>(this StateMachineScope scope, string name, params Func<StateMachineScope, IObservable<TResult>>[] observables)
+        {
+            var whenAnyScope = scope.BeginScope(name);
+            return Observable.Merge(observables.Select(obs => obs(whenAnyScope))).Take(1)
+                .TapAsync(() => whenAnyScope.RemoveScopeAwaiters());
         }
 
         /// <summary>
         /// Starts await for event or triggers it if it is in events queue.
         /// </summary>
-        private static IObservable<TEvent> StopAndWait<TEvent>(StateMachineScope scope, Func<TEvent, bool> matches = null)
+        private static IObservable<TEvent> WaitOrHandle<TEvent>(StateMachineScope scope, string stateId, IEventAwaiter<TEvent> eventAwaiter, Func<TEvent, bool> matches)
         {
             var notHandledEvents = scope.GetEvents(matches).ToList();
 
@@ -70,7 +78,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
 
             return Observable.Create<TEvent>(async observer =>
             {
-                await scope.AddEventAwaiter<TEvent>();
+                await scope.AddEventAwaiter<TEvent>(stateId, eventAwaiter);
                 observer.OnCompleted();
             });
         }

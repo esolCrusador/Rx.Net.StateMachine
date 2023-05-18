@@ -11,6 +11,7 @@ namespace Rx.Net.StateMachine.Storage
         PersistEachAwaiter = 2,
         PersistEachEvent = 4,
         PersistEachItem = 8,
-        PersistEachTime = PersistFinally | PersistEachState | PersistEachAwaiter | PersistEachEvent | PersistEachItem
+        PersistIsDefault = 16,
+        PersistEachTime = PersistFinally | PersistEachState | PersistEachAwaiter | PersistEachEvent | PersistEachItem | PersistIsDefault
     }
 }

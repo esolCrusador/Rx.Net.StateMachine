@@ -9,6 +9,7 @@ namespace Rx.Net.StateMachine.Storage
         Task PersistItemState(SessionState sessionState);
         Task PersistEventState(SessionState sessionState);
         Task PersistEventAwaiter(SessionState sessionState);
+        Task PersistIsDefault(SessionState sessionState);
         Task PersistSessionState(SessionState sessionState);
     }
 }

@@ -39,6 +39,12 @@ namespace Rx.Net.StateMachine.Storage
                 await _persist(sessionState);
         }
 
+        public async Task PersistIsDefault(SessionState sessionState)
+        {
+            if (StrategyContains(PersistStrategy.PersistIsDefault))
+                await _persist(sessionState);
+        }
+
         public async Task PersistSessionState(SessionState sessionState)
         {
             if (StrategyContains(PersistStrategy.PersistFinally))
@@ -47,7 +53,6 @@ namespace Rx.Net.StateMachine.Storage
 
         private bool StrategyContains(PersistStrategy persistStrategy) =>
             (_persistStrategy & persistStrategy) == persistStrategy;
-
 
         public static readonly SessionStateStorage Empty = new SessionStateStorage(PersistStrategy.Default, ss => Task.CompletedTask);
     }

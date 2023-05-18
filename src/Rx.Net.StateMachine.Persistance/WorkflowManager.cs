@@ -1,4 +1,5 @@
-﻿using Rx.Net.StateMachine.Persistance.Entities;
+﻿using Rx.Net.StateMachine.Events;
+using Rx.Net.StateMachine.Persistance.Entities;
 using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Storage;
 using Rx.Net.StateMachine.WorkflowFactories;
@@ -14,13 +15,15 @@ namespace Rx.Net.StateMachine.Persistance
     {
         private readonly ISessionStateUnitOfWorkFactory _uofFactory;
         private readonly IWorkflowResolver _workflowResolver;
+        private readonly IEventAwaiterResolver _eventAwaiterResolver;
 
         public StateMachine StateMachine { get; }
 
-        public WorkflowManager(ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, StateMachine stateMachine)
+        public WorkflowManager(ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, IEventAwaiterResolver eventAwaiterResolver, StateMachine stateMachine)
         {
             _uofFactory = uofFactory;
             _workflowResolver = workflowResolver;
+            _eventAwaiterResolver = eventAwaiterResolver;
             StateMachine = stateMachine;
         }
 
@@ -48,13 +51,17 @@ namespace Rx.Net.StateMachine.Persistance
             return await StartHandleSessionState(source, newSessionStateEntity, sessionState, context, uof);
         }
 
+        public async Task RemoveDefaultSesssions(Guid? newDefaultSessionId, string userContextId)
+        {
+            await HandleEvent(new DefaultSessionRemoved { SessionId = newDefaultSessionId, UserContextId = userContextId });
+        }
+
         public async Task<List<HandlingResult>> HandleEvent<TEvent>(TEvent @event)
         {
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
 
             await using var uof = _uofFactory.Create();
-            var eventType = SessionEventAwaiter.GetTypeName(@event.GetType());
 
             var sessionStates = await uof.GetSessionStates(@event);
 
@@ -91,7 +98,7 @@ namespace Rx.Net.StateMachine.Persistance
         private async Task<HandlingResult> HandleSessionStateEvent<TEvent>(SessionStateEntity sessionStateEntity, TEvent @event, ISessionStateUnitOfWork uof)
         {
             var sessionState = ToSessionState(sessionStateEntity);
-            bool isAdded = StateMachine.AddEvent(sessionState, @event);
+            bool isAdded = StateMachine.AddEvent(sessionState, @event, _eventAwaiterResolver.GetEventAwaiters(@event));
             if (!isAdded && sessionState.Status != SessionStateStatus.Created)
                 return HandlingResult.Ignored;
 
@@ -125,13 +132,15 @@ namespace Rx.Net.StateMachine.Persistance
         private static SessionState ToSessionState(SessionStateEntity entity)
         {
             return new SessionState(
+                entity.SessionStateId,
                 entity.WorkflowId,
                 entity.Context,
+                entity.IsDefault,
                 entity.Counter,
                 entity.Steps.ToDictionary(s => s.Id, s => new SessionStateStep(s.State, s.SequenceNumber)),
                 entity.Items.ToDictionary(i => i.Id, i => i.Value),
                 MapSessionEvents(entity.PastEvents),
-                entity.Awaiters.Select(aw => new SessionEventAwaiter(aw.AwaiterId, aw.TypeName, aw.SequenceNumber)).ToList()
+                entity.Awaiters.Select(aw => new SessionEventAwaiter(aw.AwaiterId, aw.Name, aw.Identifier, aw.SequenceNumber)).ToList()
             )
             {
                 Status = entity.Status,
@@ -142,6 +151,7 @@ namespace Rx.Net.StateMachine.Persistance
         private static void UpdateSessionStateEntity(SessionState state, SessionStateEntity dest)
         {
             dest.WorkflowId = state.WorkflowId;
+            dest.IsDefault = state.IsDefault;
             dest.Steps = state.Steps.Select(kvp =>
                     new SessionStepEntity
                     {
@@ -159,7 +169,8 @@ namespace Rx.Net.StateMachine.Persistance
             dest.Awaiters = state.SessionEventAwaiters.Select(aw => new SessionEventAwaiterEntity
             {
                 AwaiterId = aw.AwaiterId,
-                TypeName = aw.TypeName,
+                Name = aw.Name,
+                Identifier = aw.Identifier,
                 SequenceNumber = aw.SequenceNumber
             }).ToList();
             dest.Counter = state.Counter;

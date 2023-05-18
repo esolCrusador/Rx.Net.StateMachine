@@ -1,4 +1,6 @@
-﻿using Rx.Net.StateMachine.Exceptions;
+﻿using Rx.Net.StateMachine.Events;
+using Rx.Net.StateMachine.Exceptions;
+using Rx.Net.StateMachine.Extensions;
 using Rx.Net.StateMachine.Helpers;
 using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Storage;
@@ -17,6 +19,7 @@ namespace Rx.Net.StateMachine
         public StateMachine StateMachine { get; }
         public SessionState SessionState { get; }
         public ISessionStateStorage SessionStateStorage { get; }
+        public Guid SessionId => SessionState.SessionStateId.GetValue("SessionStateId");
 
         public StateMachineScope(StateMachine stateMachine, SessionState sessionState, ISessionStateStorage sessionStateRepository, string prefix = null)
         {
@@ -114,9 +117,9 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
-        public Task AddEvent<TEvent>(TEvent @event)
+        public Task AddEvent<TEvent>(TEvent @event, IEnumerable<IEventAwaiter<TEvent>> eventAwaiters)
         {
-            SessionState.AddEvent<TEvent>(@event);
+            SessionState.AddEvent<TEvent>(@event, eventAwaiters);
 
             return SessionStateStorage.PersistEventState(SessionState);
         }
@@ -128,9 +131,23 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistEventState(SessionState);
         }
 
-        public Task AddEventAwaiter<TEvent>()
+        public Task AddEventAwaiter<TEvent>(string stateId, IEventAwaiter<TEvent> eventAwaiter)
         {
-            SessionState.AddEventAwaiter<TEvent>();
+            SessionState.AddEventAwaiter<TEvent>(AddPrefix(stateId), eventAwaiter);
+
+            return SessionStateStorage.PersistEventAwaiter(SessionState);
+        }
+
+        public Task MakeDefault(bool isDefault)
+        {
+            SessionState.MakeDefault(isDefault);
+
+            return SessionStateStorage.PersistIsDefault(SessionState);
+        }
+
+        public Task RemoveScopeAwaiters()
+        {
+            SessionState.RemoveEventAwaiters(StatePrefix);
 
             return SessionStateStorage.PersistEventAwaiter(SessionState);
         }

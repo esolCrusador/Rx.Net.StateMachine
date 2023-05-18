@@ -28,7 +28,7 @@ namespace Rx.Net.StateMachine.States
             var eventType = sessionEvent.Event.GetType();
             SerializedEvent = JsonSerializer.Serialize(sessionEvent.Event, eventType, options);
             EventType = eventType.AssemblyQualifiedName;
-            Awaiters = sessionEvent.Awaiters.Select(a => $"{a.AwaiterId:N}-{a.Type.FullName}-{a.SequenceNumber}").ToArray();
+            Awaiters = sessionEvent.Awaiters.Select(a => $"{a.AwaiterId:N}-{a.Identifier}-{a.SequenceNumber}").ToArray();
             Handled = sessionEvent.Handled;
         }
     }

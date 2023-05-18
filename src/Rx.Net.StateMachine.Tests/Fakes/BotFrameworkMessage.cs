@@ -12,13 +12,15 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         public string Text { get; }
         public IReadOnlyCollection<KeyValuePair<string, string>>? Buttons { get; set; }
         public int? ReplyToMessageId { get; set; }
-        public BotFrameworkMessage(int messageId, long botId, long chatId, MessageSource source, string text)
+        public UserInfo UserInfo { get; set; }
+        public BotFrameworkMessage(int messageId, long botId, long chatId, MessageSource source, string text, UserInfo userInfo)
         {
             MessageId = messageId;
             Source = source;
             Text = text;
             BotId = botId;
             ChatId = chatId;
+            UserInfo = userInfo;
         }
     }
 }
