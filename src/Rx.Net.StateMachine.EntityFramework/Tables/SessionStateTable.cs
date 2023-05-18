@@ -20,5 +20,6 @@ namespace Rx.Net.StateMachine.EntityFramework.Tables
         public string? Result { get; set; }
         public TContextKey ContextId { get; set; }
         public TContext Context { get; set; }
+        [Timestamp] public byte[] ConcurrencyToken { get; set; }
     }
 }
