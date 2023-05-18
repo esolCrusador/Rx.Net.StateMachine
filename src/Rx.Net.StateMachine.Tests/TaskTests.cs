@@ -102,6 +102,23 @@ namespace Rx.Net.StateMachine.Tests
         }
 
         [Fact]
+        public async Task Should_Handle_Concurrency()
+        {
+            await _ctx.Chat.SendUserMessage(_botId, _studentId, "/start");
+            var message = _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
+
+            _ctx.ContextFactory.ExecuteBeforeNextSaveChanges(() => _ctx.Chat.ClickButtonAndWaitUntilHandled(message, "Hi"));
+            await _ctx.Chat.ClickButtonAndWaitUntilHandled(message, "Hi");
+
+            var messages = _ctx.Chat.ReadNewBotMessages(_botId, _studentId);
+            messages.Should().HaveCount(2);
+            // Message should be duplicated because we don't support idenpotency for message sending in Workflow
+            // To make message single we must store message to database before sending and have idenpotency key of message
+            foreach (var msg in messages)
+                msg.Text.Should().Be("*First Task*\r\nDescription"); 
+        }
+
+        [Fact]
         public async Task Should_Change_Task_Status()
         {
             var taskMessage = await StartFirstTask();
@@ -277,10 +294,13 @@ namespace Rx.Net.StateMachine.Tests
 
             var studentTaskMessage = await SubmitFirtTask("Result");
 
-            var messages = _ctx.Chat.ReadNewBotMessages(_botId, _curatorId);
+            await _ctx.AsyncWait.For(async () =>
+            {
+                var messages = _ctx.Chat.ReadNewBotMessages(_botId, _curatorId);
 
-            var taskMessage = messages.First();
-            await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.Last().Key);
+                var taskMessage = messages.First();
+                await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.Last().Key);
+            });
 
             await _ctx.Chat.SendUserMessage(_botId, _curatorId, "Well done!");
 
@@ -321,7 +341,7 @@ namespace Rx.Net.StateMachine.Tests
             }
 
             await _ctx.Chat.ClickButton(taskMessage, taskMessage.Buttons!.First().Key); // Submit
-            if(resultText != null)
+            if (resultText != null)
             {
                 var confirmation = _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
                 await _ctx.Chat.ClickButton(confirmation, confirmation.Buttons!.Last().Value);

@@ -1,5 +1,7 @@
-﻿using Rx.Net.StateMachine.Events;
+﻿using Polly;
+using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Persistance.Entities;
+using Rx.Net.StateMachine.Persistance.Exceptions;
 using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Storage;
 using Rx.Net.StateMachine.WorkflowFactories;
@@ -13,6 +15,8 @@ namespace Rx.Net.StateMachine.Persistance
 {
     public class WorkflowManager<TContext>
     {
+        private readonly AsyncPolicy _concurrencyRetry = Policy.Handle<ConcurrencyException>()
+            .RetryForeverAsync();
         private readonly ISessionStateUnitOfWorkFactory _uofFactory;
         private readonly IWorkflowResolver _workflowResolver;
         private readonly IEventAwaiterResolver _eventAwaiterResolver;
@@ -56,23 +60,26 @@ namespace Rx.Net.StateMachine.Persistance
             await HandleEvent(new DefaultSessionRemoved { SessionId = newDefaultSessionId, UserContextId = userContextId });
         }
 
-        public async Task<List<HandlingResult>> HandleEvent<TEvent>(TEvent @event)
+        public Task<List<HandlingResult>> HandleEvent<TEvent>(TEvent @event)
         {
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
 
-            await using var uof = _uofFactory.Create();
+            return _concurrencyRetry.ExecuteAsync(async () =>
+            {
+                await using var uof = _uofFactory.Create();
 
-            var sessionStates = await uof.GetSessionStates(@event);
+                var sessionStates = await uof.GetSessionStates(@event);
 
-            if (sessionStates.Count == 0)
-                return new List<HandlingResult>();
+                if (sessionStates.Count == 0)
+                    return new List<HandlingResult>();
 
-            List<HandlingResult> results = new List<HandlingResult>(sessionStates.Count);
-            foreach (var ss in sessionStates)
-                results.Add(await HandleSessionStateEvent(ss, @event, uof));
+                List<HandlingResult> results = new List<HandlingResult>(sessionStates.Count);
+                foreach (var ss in sessionStates)
+                    results.Add(await HandleSessionStateEvent(ss, @event, uof));
 
-            return results;
+                return results;
+            });
         }
 
         private SessionStateEntity CreateNewSessionState(string workflowId, ISessionStateUnitOfWork uof, TContext context)
