@@ -22,7 +22,7 @@ using Rx.Net.StateMachine.Tests.Awaiters;
 namespace Rx.Net.StateMachine.Tests
 {
     // https://www.figma.com/file/65UWsCMvohKGerVrUWWFdd/Task-Workflow?type=whiteboard&node-id=0-1&t=HtMQYV7kgZbTx2GO-0
-    public abstract partial class TaskTests : IAsyncLifetime
+    public abstract class TaskTests : IAsyncLifetime
     {
         private readonly StateMachineTestContext _ctx;
         private readonly long _botId = new Random().NextInt64(long.MaxValue);
