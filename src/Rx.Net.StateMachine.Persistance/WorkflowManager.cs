@@ -113,7 +113,7 @@ namespace Rx.Net.StateMachine.Persistance
                 return uof.Save();
             });
 
-            var workflowFactory = await _workflowResolver.GetWorkflowFactory(sessionState.WorkflowId);
+            var workflowFactory = await _workflowResolver.GetWorkflow(sessionState.WorkflowId);
             return await StateMachine.HandleWorkflow(sessionState, storage, workflowFactory);
         }
 
@@ -125,7 +125,7 @@ namespace Rx.Net.StateMachine.Persistance
                 return uof.Save();
             });
 
-            var workflowFactory = await _workflowResolver.GetWorkflowFactory<TSource, Unit>(sessionState.WorkflowId);
+            var workflowFactory = await _workflowResolver.GetWorkflow<TSource, Unit>(sessionState.WorkflowId);
             return await StateMachine.StartHandleWorkflow(source, sessionState, storage, workflowFactory);
         }
 

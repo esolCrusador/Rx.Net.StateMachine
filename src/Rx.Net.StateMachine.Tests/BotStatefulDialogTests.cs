@@ -139,7 +139,7 @@ namespace Rx.Net.StateMachine.Tests
             var context = await _ctx.UserContextRepository.GetUserOrCreateContext(_botId, _chatId, "Boris Sotsky", "esolCrusador");
 
             await _ctx.StateMachine.StartHandleWorkflow(new ItemWithMessage(item, null), context,
-                await _ctx.WorkflowResolver.GetWorkflowFactory<ItemWithMessage, Unit>(TaskActionsWorkflowFactory.Id)
+                await _ctx.WorkflowResolver.GetWorkflow<ItemWithMessage, Unit>(TaskActionsWorkflowFactory.Id)
             );
         }
 
@@ -152,7 +152,7 @@ namespace Rx.Net.StateMachine.Tests
                 var state = _ctx.StateMachine.ParseSessionState(context, stateString);
                 _ctx.StateMachine.ForceAddEvent(state, buttonClick);
 
-                await _ctx.StateMachine.HandleWorkflow(state, await _ctx.WorkflowResolver.GetWorkflowFactory(state.WorkflowId));
+                await _ctx.StateMachine.HandleWorkflow(state, await _ctx.WorkflowResolver.GetWorkflow(state.WorkflowId));
             }
             else
             {

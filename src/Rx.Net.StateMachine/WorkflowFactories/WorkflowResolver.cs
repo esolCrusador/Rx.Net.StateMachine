@@ -13,19 +13,19 @@ namespace Rx.Net.StateMachine.WorkflowFactories
             _workflowFactories = workflowFactories.ToDictionary(wf => wf.WorkflowId);
         }
 
-        public Task<IWorkflow> GetWorkflowFactory(string workflowId)
+        public Task<IWorkflow> GetWorkflow(string workflowId)
         {
             return Task.FromResult(_workflowFactories[workflowId]);
         }
 
-        public async Task<IWorkflow<TResult>> GetWorkflowFactory<TResult>(string workflowId)
+        public async Task<IWorkflow<TResult>> GetWorkflow<TResult>(string workflowId)
         {
-            return (IWorkflow<TResult>)await GetWorkflowFactory(workflowId);
+            return (IWorkflow<TResult>)await GetWorkflow(workflowId);
         }
 
-        public async Task<IWorkflow<TSource, TResult>> GetWorkflowFactory<TSource, TResult>(string workflowId)
+        public async Task<IWorkflow<TSource, TResult>> GetWorkflow<TSource, TResult>(string workflowId)
         {
-            return (IWorkflow<TSource, TResult>)await GetWorkflowFactory(workflowId);
+            return (IWorkflow<TSource, TResult>)await GetWorkflow(workflowId);
         }
     }
 }
