@@ -81,7 +81,7 @@ namespace Rx.Net.StateMachine.Persistance
             {
                 SessionStateId = Guid.NewGuid(),
                 WorkflowId = workflowId,
-                Status = SessionStateStatus.Created,
+                Status = SessionStateStatus.InProgress,
                 Steps = new List<SessionStepEntity>(),
                 Items = new List<SessionItemEntity>(),
                 Awaiters = new List<SessionEventAwaiterEntity>(),
@@ -99,7 +99,7 @@ namespace Rx.Net.StateMachine.Persistance
         {
             var sessionState = ToSessionState(sessionStateEntity);
             bool isAdded = StateMachine.AddEvent(sessionState, @event, _eventAwaiterResolver.GetEventAwaiters(@event));
-            if (!isAdded && sessionState.Status != SessionStateStatus.Created)
+            if (!isAdded)
                 return HandlingResult.Ignored;
 
             return await HandleSessionState(sessionStateEntity, sessionState, uof);

@@ -18,7 +18,7 @@ using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 {
-    public abstract class EFSessionStateUnitOfWork<TContext, TContextKey> : ISessionStateUnitOfWork
+    public class EFSessionStateUnitOfWork<TContext, TContextKey> : ISessionStateUnitOfWork
         where TContext : class
     {
         record SessionStateData
@@ -81,9 +81,8 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             var sessions = await SessionStateDbContext.SessionStates
                 .Include(ss => ss.Context)
                 .Include(ss => ss.Awaiters)
-                .Where(ss => ss.Status == SessionStateStatus.InProgress)
-                .Where(awaitHandler.GetSessionStateFilter(@event))
                 .Where(GetAwaitersFilter(awaitHandler, @event))
+                .Where(awaitHandler.GetSessionStateFilter(@event))
                 .ToListAsync();
 
             return MapToSessionStates(sessions);
@@ -94,7 +93,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             var awaiterIdentifiers = awaiterHandler.GetAwaiterIdTypes()
                 .Select(at => AwaiterExtensions.CreateAwaiter(at, @event).AwaiterId).ToList();
 
-            return ss => ss.Awaiters.Any(aw => awaiterIdentifiers.Contains(aw.Identifier));
+            return ss => ss.Awaiters.Any(aw => aw.IsActive && awaiterIdentifiers.Contains(aw.Identifier));
         }
 
         public void Dispose() => SessionStateDbContext.Dispose();
@@ -105,7 +104,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         {
             foreach (var pair in _loadedSessionStates.Values)
                 Map(pair.SessionState, pair.Row);
-
+            
             await SessionStateDbContext.SaveChangesAsync();
         }
 
@@ -151,6 +150,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                     SessionStateDbContext.Remove(db);
                     dest.Awaiters.Remove(db);
                 })
+                .Update((db, aw) => db.IsActive = dest.Status == SessionStateStatus.InProgress)
                 .Create(aw =>
                 {
                     var awaiter = new SessionEventAwaiterTable<TContext, TContextKey>
@@ -160,7 +160,8 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                         SequenceNumber = aw.SequenceNumber,
                         Name = aw.Name,
                         Identifier = aw.Identifier,
-                        ContextId = dest.ContextId
+                        ContextId = dest.ContextId,
+                        IsActive = dest.Status == SessionStateStatus.InProgress
                     };
                     SessionStateDbContext.Add(awaiter);
                     dest.Awaiters.Add(awaiter);

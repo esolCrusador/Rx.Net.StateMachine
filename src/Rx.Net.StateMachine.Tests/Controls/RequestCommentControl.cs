@@ -50,7 +50,7 @@ namespace Rx.Net.StateMachine.Tests.Controls
                 scope,
                 "UserMessageOrTimeout",
                 (messageId, innerScope) =>
-                    innerScope.StopAndWait<BotFrameworkMessage>("UserMessage", BotFrameworkMessageAwaiter.Default)
+                    innerScope.StopAndWait<BotFrameworkMessage>("UserMessage", new BotFrameworkMessageAwaiter(userContext))
                     .SelectAsync(async message =>
                     {
                         var comment = await _taskRepository.AddComment(
@@ -83,7 +83,7 @@ namespace Rx.Net.StateMachine.Tests.Controls
                                         .MapToVoid();
                 },
                 (messageId, innerScope) =>
-                    scope.StopAndWait<DefaultSessionRemoved>("DefaultSessionRemoved", DefaultSessionRemovedAwaiter.Default)
+                    innerScope.StopAndWait<DefaultSessionRemoved>("DefaultSessionRemoved", DefaultSessionRemovedAwaiter.Default)
                     .MapToVoid()
             )
             .FinallyAsync(async (isExecuted, el, ex) =>

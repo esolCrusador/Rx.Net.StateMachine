@@ -21,7 +21,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
     {
         private IServiceCollection _services;
 
-        public StateMachineTestContextBuilder(IServiceCollection services) => 
+        public StateMachineTestContextBuilder(IServiceCollection services) =>
             _services = services;
 
         public StateMachineTestContextBuilder Configure(Action<IServiceCollection> configure)
@@ -53,7 +53,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
         }
 
         public StateMachineTestContextBuilder AddWorkflow<TWorkflowFactory>()
-            where TWorkflowFactory: class, IWorkflow
+            where TWorkflowFactory : class, IWorkflow
         {
             _services.AddWorkflowFactory<TWorkflowFactory>();
             return this;
@@ -75,23 +75,8 @@ namespace Rx.Net.StateMachine.Tests.Testing
             services.AddEFStateMachine()
                 .WithContext<UserContext>()
                 .WithKey(uc => uc.ContextId)
-                .AddAwaiterHandler<BotFrameworkMessage>(c => c
-                    .WithContextFilter(ev => ss => ss.Context.BotId == ev.BotId && ss.Context.ChatId == ev.ChatId && ss.IsDefault)
-                    .WithAwaiter<BotFrameworkMessageAwaiter>()
-                )
-                .AddAwaiterHandler<BotFrameworkButtonClick>(c => c
-                    .WithContextFilter(ev =>
-                    {
-                        if (WorkflowCallbackQuery.TryParse(ev.SelectedValue, out var query))
-                        {
-                            if (query.SessionId != null)
-                                return ss => ss.SessionStateId == query.SessionId.Value;
-                        }
-
-                        return ss => true;
-                    })
-                    .WithAwaiter<BotFrameworkButtonClickAwaiter>()
-                )
+                .AddAwaiterHandler<BotFrameworkMessage>(c => c.WithAwaiter<BotFrameworkMessageAwaiter>())
+                .AddAwaiterHandler<BotFrameworkButtonClick>(c => c.WithAwaiter<BotFrameworkButtonClickAwaiter>())
                 .AddAwaiterHandler<TaskCreatedEvent>(c => c.WithAwaiter<TaskCreatedEventAwaiter>())
                 .AddAwaiterHandler<TaskStateChanged>(c => c.WithAwaiter<TaskStateChangedAwaiter>())
                 .AddAwaiterHandler<TimeoutEvent>(c => c.WithAwaiter<TimeoutEventAwaiter>())
