@@ -14,7 +14,7 @@ namespace Rx.Net.StateMachine.Tests.DataAccess
 {
     public class TaskRepository
     {
-        private readonly SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, int> _contextFactory;
+        private readonly SessionStateDbContextFactory<TestSessionStateDbContext> _contextFactory;
         private readonly MessageQueue _messageQueue;
         private static readonly Expression<Func<TaskEntity, TaskModel>> TaskSelectorExpression = t => new TaskModel
         {
@@ -33,7 +33,7 @@ namespace Rx.Net.StateMachine.Tests.DataAccess
         };
         private static readonly Func<TaskEntity, TaskModel> TaskSelector = TaskSelectorExpression.Compile();
 
-        public TaskRepository(SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, int> contextFactory, MessageQueue messageQueue)
+        public TaskRepository(SessionStateDbContextFactory<TestSessionStateDbContext> contextFactory, MessageQueue messageQueue)
         {
             _contextFactory = contextFactory;
             _messageQueue = messageQueue;

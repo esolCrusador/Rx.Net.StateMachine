@@ -12,7 +12,6 @@ namespace Rx.Net.StateMachine.States
 
         public SessionEventAwaiter(string name, IEventAwaiter eventAwaiter, int sequenceNumber)
         {
-            AwaiterId = Guid.NewGuid();
             Name = name;
             Identifier = eventAwaiter.AwaiterId;
             SequenceNumber = sequenceNumber;

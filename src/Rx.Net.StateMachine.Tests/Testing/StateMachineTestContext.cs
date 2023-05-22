@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.Persistance;
+using Rx.Net.StateMachine.Tests.Concurrency;
 using Rx.Net.StateMachine.Tests.DataAccess;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
@@ -16,8 +17,9 @@ namespace Rx.Net.StateMachine.Tests.Testing
 
         public WorkflowManager<UserContext> WorkflowManager => _services.GetRequiredService<WorkflowManager<UserContext>>();
         public ChatFake Chat => _services.GetRequiredService<ChatFake>();
-        public SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, int> ContextFactory =>
-            _services.GetRequiredService<SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, int>>();
+        public GlobalContextState GlobalContextState => _services.GetRequiredService<GlobalContextState>();
+        public SessionStateDbContextFactory<TestSessionStateDbContext> ContextFactory =>
+            _services.GetRequiredService<SessionStateDbContextFactory<TestSessionStateDbContext>>();
         public UserContextRepository UserContextRepository => _services.GetRequiredService<UserContextRepository>();
         public StateMachine StateMachine => _services.GetRequiredService<StateMachine>();
         public IWorkflowResolver WorkflowResolver => _services.GetRequiredService<IWorkflowResolver>();

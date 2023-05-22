@@ -8,12 +8,14 @@ using Rx.Net.StateMachine.EntityFramework.UnitOfWork;
 using Rx.Net.StateMachine.Extensions;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Persistance.Entities;
+using Rx.Net.StateMachine.Persistance.Exceptions;
 using Rx.Net.StateMachine.States;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
@@ -33,11 +35,11 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             public SessionStateTable<TContext, TContextKey> Row { get; }
         }
         private readonly Dictionary<Guid, SessionStateData> _loadedSessionStates;
-        private SessionStateDbContext<TContext, TContextKey>? _sessionStateContext;
+        private DbContext? _sessionStateContext;
         private ContextKeySelector<TContext, TContextKey>? _contextKeySelector;
         private AwaitHandlerResolver<TContext, TContextKey>? _eventAwaiterResolver;
 
-        protected internal SessionStateDbContext<TContext, TContextKey> SessionStateDbContext
+        protected internal DbContext SessionStateDbContext
         {
             get => _sessionStateContext ?? throw new ArgumentException($"{nameof(SessionStateDbContext)} is not initialized");
             set => _sessionStateContext = value;
@@ -69,7 +71,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             Map(sessionState, row);
             row.ContextId = ContextKeySelector.GetContextKey((TContext)sessionState.Context);
             _loadedSessionStates.Add(row.SessionStateId, new SessionStateData(sessionState, row));
-            SessionStateDbContext.SessionStates.Add(row);
+            SessionStateDbContext.Set<SessionStateTable<TContext, TContextKey>>().Add(row);
 
             return Task.CompletedTask;
         }
@@ -78,7 +80,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         {
             var awaitHandler = EventAwaiterResolver.GetAwaiterHandler(@event.GetType());
 
-            var sessions = await SessionStateDbContext.SessionStates
+            var sessions = await SessionStateDbContext.Set<SessionStateTable<TContext, TContextKey>>()
                 .Include(ss => ss.Context)
                 .Include(ss => ss.Awaiters)
                 .Where(GetAwaitersFilter(awaitHandler, @event))
@@ -104,8 +106,15 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         {
             foreach (var pair in _loadedSessionStates.Values)
                 Map(pair.SessionState, pair.Row);
-            
-            await SessionStateDbContext.SaveChangesAsync();
+
+            try
+            {
+                await SessionStateDbContext.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                throw new ConcurrencyException(ex);
+            }
         }
 
         private void Map(SessionStateTable<TContext, TContextKey> source, SessionStateEntity dest)
@@ -155,7 +164,6 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 {
                     var awaiter = new SessionEventAwaiterTable<TContext, TContextKey>
                     {
-                        AwaiterId = aw.AwaiterId,
                         SessionStateId = source.SessionStateId,
                         SequenceNumber = aw.SequenceNumber,
                         Name = aw.Name,

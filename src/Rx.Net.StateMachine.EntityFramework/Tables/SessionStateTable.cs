@@ -17,7 +17,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tables
         public string PastEvents { get; set; }
         public List<SessionEventAwaiterTable<TContext, TContextKey>> Awaiters { get; set; }
         public SessionStateStatus Status { get; set; }
-        public string? Result { get; set; }
+        [StringLength(1024)] public string? Result { get; set; }
         public TContextKey ContextId { get; set; }
         public TContext Context { get; set; }
         [Timestamp] public byte[] ConcurrencyToken { get; set; }

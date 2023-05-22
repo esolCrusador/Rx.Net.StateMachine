@@ -107,7 +107,7 @@ namespace Rx.Net.StateMachine.Tests
             await _ctx.Chat.SendUserMessage(_botId, _studentId, "/start");
             var message = _ctx.Chat.ReadNewBotMessages(_botId, _studentId).Single();
 
-            _ctx.ContextFactory.ExecuteBeforeNextSaveChanges(() => _ctx.Chat.ClickButtonAndWaitUntilHandled(message, "Hi"));
+            _ctx.GlobalContextState.OnBeforeNextSaveChanges(() => _ctx.Chat.ClickButtonAndWaitUntilHandled(message, "Hi"));
             await _ctx.Chat.ClickButtonAndWaitUntilHandled(message, "Hi");
 
             var messages = _ctx.Chat.ReadNewBotMessages(_botId, _studentId);

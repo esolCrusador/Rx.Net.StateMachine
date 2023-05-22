@@ -8,11 +8,11 @@ public class EFSessionStateUnitOfWorkFactory<TContext, TContextKey, TUnitOfWork>
     where TContext: class
     where TUnitOfWork: EFSessionStateUnitOfWork<TContext, TContextKey>, new()
 {
-    private readonly SessionStateDbContextFactory<TContext, TContextKey> _contextFactory;
+    private readonly SessionStateDbContextFactory _contextFactory;
     private readonly ContextKeySelector<TContext, TContextKey> _contextKeySelector;
     private readonly AwaitHandlerResolver<TContext, TContextKey> _awaitHandlerResolver;
 
-    public EFSessionStateUnitOfWorkFactory(SessionStateDbContextFactory<TContext, TContextKey> contextFactory, ContextKeySelector<TContext, TContextKey> contextKeySelector, AwaitHandlerResolver<TContext, TContextKey> awaitHandlerResolver)
+    public EFSessionStateUnitOfWorkFactory(SessionStateDbContextFactory contextFactory, ContextKeySelector<TContext, TContextKey> contextKeySelector, AwaitHandlerResolver<TContext, TContextKey> awaitHandlerResolver)
     {
         _contextFactory = contextFactory;
         _contextKeySelector = contextKeySelector;

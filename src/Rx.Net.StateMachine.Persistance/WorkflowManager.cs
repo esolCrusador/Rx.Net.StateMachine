@@ -175,7 +175,6 @@ namespace Rx.Net.StateMachine.Persistance
             dest.PastEvents = MapSessionEventEntities(state.PastEvents);
             dest.Awaiters = state.SessionEventAwaiters.Select(aw => new SessionEventAwaiterEntity
             {
-                AwaiterId = aw.AwaiterId,
                 Name = aw.Name,
                 Identifier = aw.Identifier,
                 SequenceNumber = aw.SequenceNumber

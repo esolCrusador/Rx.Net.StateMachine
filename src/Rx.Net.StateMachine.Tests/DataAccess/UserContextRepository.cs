@@ -8,9 +8,9 @@ namespace Rx.Net.StateMachine.Tests.DataAccess
 {
     public class UserContextRepository
     {
-        private readonly SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, int> _contextFactory;
+        private readonly SessionStateDbContextFactory<TestSessionStateDbContext> _contextFactory;
 
-        public UserContextRepository(SessionStateDbContextFactory<TestSessionStateDbContext, UserContext, int> contextFactory)
+        public UserContextRepository(SessionStateDbContextFactory<TestSessionStateDbContext> contextFactory)
         {
             _contextFactory = contextFactory;
         }

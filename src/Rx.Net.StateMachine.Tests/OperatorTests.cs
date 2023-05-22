@@ -79,7 +79,7 @@ namespace Rx.Net.StateMachine.Tests
             message.Text.Should().Be("Well Done!");
 
             await using var context = _ctx.ContextFactory.Create();
-            var ss = await context.SessionStates.Select(ss => new
+            var ss = await context.Set<SessionStateTable<UserContext, int>>().Select(ss => new
             {
                 ss.SessionStateId,
                 Awaiters = ss.Awaiters.ToList()

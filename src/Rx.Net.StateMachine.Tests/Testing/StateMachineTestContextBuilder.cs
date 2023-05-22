@@ -4,6 +4,7 @@ using Rx.Net.StateMachine.EntityFramework;
 using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Tests.Awaiters;
+using Rx.Net.StateMachine.Tests.Concurrency;
 using Rx.Net.StateMachine.Tests.Controls;
 using Rx.Net.StateMachine.Tests.DataAccess;
 using Rx.Net.StateMachine.Tests.Events;
@@ -62,7 +63,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
         public StateMachineTestContext Build() =>
             new StateMachineTestContext(_services.BuildServiceProvider());
 
-        public static IServiceCollection RegisterDefaultServices(Func<TestSessionStateDbContext> createContext)
+        public static IServiceCollection RegisterDefaultServices(Func<GlobalContextState, TestSessionStateDbContext> createContext)
         {
             var services = new ServiceCollection();
             services.AddSingleton(createContext);
@@ -70,6 +71,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
             services.AddSingleton<ChatFake>();
             services.AddSingleton<MessageQueue>();
             services.AddSingleton<FakeScheduler>();
+            services.AddSingleton<GlobalContextState>();
             services.AddControls();
 
             services.AddEFStateMachine()
@@ -95,7 +97,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
                     var contextId = int.Parse(ev.UserContextId);
                     return ss => ss.IsDefault && ss.ContextId == contextId && ss.SessionStateId != ev.SessionId;
                 }).WithAwaiter<DefaultSessionRemovedAwaiter>())
-                .WithDbContext(createContext)
+                .WithDbContext(sp => createContext(sp.GetRequiredService<GlobalContextState>()))
                 .WithUnitOfWork<TestEFSessionStateUnitOfWork>();
             services.AddSingleton<UserContextRepository>();
 
@@ -105,7 +107,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
         {
             var databaseName = $"TestDatabase-{Guid.NewGuid()}";
 
-            var services = RegisterDefaultServices(() => new TestSessionStateDbContext(new DbContextOptionsBuilder().UseInMemoryDatabase(databaseName).Options));
+            var services = RegisterDefaultServices(gs => new TestSessionStateDbContext(gs, new DbContextOptionsBuilder().UseInMemoryDatabase(databaseName).Options));
             services.AddSingleton(sp => new AsyncWait(TimeSpan.FromMilliseconds(100)));
 
             return new StateMachineTestContextBuilder(services);
@@ -115,7 +117,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
         {
             var databaseName = $"TestDatabase-{Guid.NewGuid()}";
 
-            var services = RegisterDefaultServices(() => new TestSessionStateDbContext(new DbContextOptionsBuilder()
+            var services = RegisterDefaultServices(gs => new TestSessionStateDbContext(gs, new DbContextOptionsBuilder()
                     .UseSqlServer("Data Source =.; Integrated Security = True; TrustServerCertificate=True; Initial Catalog=TestDatabase;".Replace("TestDatabase", databaseName))
                     .Options));
             services.AddSingleton(sp => new AsyncWait(TimeSpan.FromSeconds(20)));

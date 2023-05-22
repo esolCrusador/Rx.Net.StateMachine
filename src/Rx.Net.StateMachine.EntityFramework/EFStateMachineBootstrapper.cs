@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Rx.Net.StateMachine.EntityFramework.Awaiters;
 using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.EntityFramework.Tables;
@@ -24,16 +25,16 @@ namespace Rx.Net.StateMachine.EntityFramework
             Func<IServiceProvider, TDbContext> createDbContext,
             ContextKeySelector<TContext, TContextKey> contextKeySelector
         )
-            where TDbContext : SessionStateDbContext<TContext, TContextKey>
+            where TDbContext : DbContext
             where TUnitOfWork : EFSessionStateUnitOfWork<TContext, TContextKey>, new()
             where TContext : class
         {
             services.AddSingleton(
-                sp => new SessionStateDbContextFactory<TDbContext, TContext, TContextKey>(() => createDbContext(sp))
+                sp => new SessionStateDbContextFactory<TDbContext>(() => createDbContext(sp))
             );
             services.AddSingleton(contextKeySelector);
-            services.AddSingleton<SessionStateDbContextFactory<TContext, TContextKey>>(
-                sp => sp.GetRequiredService<SessionStateDbContextFactory<TDbContext, TContext, TContextKey>>()
+            services.AddSingleton<SessionStateDbContextFactory>(
+                sp => sp.GetRequiredService<SessionStateDbContextFactory<TDbContext>>()
             );
             services.AddSingleton<ISessionStateUnitOfWorkFactory, EFSessionStateUnitOfWorkFactory<TContext, TContextKey, TUnitOfWork>>();
             services.AddSingleton<AwaitHandlerResolver<TContext, TContextKey>>();
@@ -84,13 +85,13 @@ namespace Rx.Net.StateMachine.EntityFramework
             }
 
             public UnitOfWorkBuilder<TDbContext, TContext, TContextKey> WithDbContext<TDbContext>(Func<IServiceProvider, TDbContext> createDbContext)
-                where TDbContext : SessionStateDbContext<TContext, TContextKey>
+                where TDbContext : DbContext
             {
                 return new UnitOfWorkBuilder<TDbContext, TContext, TContextKey>(_services, createDbContext, _contextKeySelector);
             }
 
             public UnitOfWorkBuilder<TDbContext, TContext, TContextKey> WithDbContext<TDbContext>(Func<TDbContext> createDbContext)
-                where TDbContext : SessionStateDbContext<TContext, TContextKey>
+                where TDbContext : DbContext
             {
                 return new UnitOfWorkBuilder<TDbContext, TContext, TContextKey>(_services, sp => createDbContext(), _contextKeySelector);
             }
@@ -157,7 +158,7 @@ namespace Rx.Net.StateMachine.EntityFramework
         }
 
         public struct UnitOfWorkBuilder<TDbContext, TContext, TContextKey>
-            where TDbContext : SessionStateDbContext<TContext, TContextKey>
+            where TDbContext : DbContext
             where TContext : class
         {
             private readonly IServiceCollection _services;
@@ -178,6 +179,4 @@ namespace Rx.Net.StateMachine.EntityFramework
             }
         }
     }
-
-
 }

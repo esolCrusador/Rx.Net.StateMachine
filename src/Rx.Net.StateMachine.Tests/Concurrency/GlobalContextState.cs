@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Rx.Net.StateMachine.EntityFramework.ContextDfinition
+namespace Rx.Net.StateMachine.Tests.Concurrency
 {
-    internal class GlobalContextState
+    public class GlobalContextState
     {
         private List<Func<Task>>? _onBeforeNextSaveChanges;
         public void OnBeforeNextSaveChanges(Func<Task> onBeforeNextSaveChanges) =>
