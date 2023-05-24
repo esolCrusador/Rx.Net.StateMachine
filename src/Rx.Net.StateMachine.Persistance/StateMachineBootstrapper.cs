@@ -18,10 +18,10 @@ namespace Rx.Net.StateMachine.Persistance
             return services;
         }
 
-        public static IServiceCollection AddWorkflowFactory<TWorkflowFactory>(this IServiceCollection services)
-            where TWorkflowFactory: class, IWorkflow
+        public static IServiceCollection AddWorkflow<TWorkflow>(this IServiceCollection services)
+            where TWorkflow: class, IWorkflow
         {
-            services.AddSingleton<IWorkflow, TWorkflowFactory>();
+            services.AddSingleton<IWorkflow, TWorkflow>();
             return services;
         }
     }

@@ -177,6 +177,9 @@ namespace Rx.Net.StateMachine.EntityFramework
             {
                 return EFStateMachineBootstrapper.AddEFStateMachine<TUnitOfWork, TDbContext, TContext, TContextKey>(_services, _createDbContext, _contextKeySelector);
             }
+
+            public IServiceCollection WithDefaultUnitOfWork() =>
+                WithUnitOfWork<EFSessionStateUnitOfWork<TContext, TContextKey>>();
         }
     }
 }

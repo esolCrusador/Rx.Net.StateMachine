@@ -56,7 +56,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
         public StateMachineTestContextBuilder AddWorkflow<TWorkflowFactory>()
             where TWorkflowFactory : class, IWorkflow
         {
-            _services.AddWorkflowFactory<TWorkflowFactory>();
+            _services.AddWorkflow<TWorkflowFactory>();
             return this;
         }
 
