@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.ObservableExtensions
 {
-    public static class TaskObservableExtensions
+    public static class AsyncObservableExtensions
     {
         public static IObservable<IObservable<TResult>> SelectAsync<TSource, TResult>(this IObservable<TSource> source, Func<TSource, CancellationToken, Task<TResult>> execute) =>
             source.Select(source =>
