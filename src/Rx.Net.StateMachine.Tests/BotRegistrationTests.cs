@@ -1,4 +1,5 @@
 ﻿using FluentAssertions;
+using Rx.Net.StateMachine.Extensions;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Tests.Awaiters;
 using Rx.Net.StateMachine.Tests.Extensions;
@@ -163,7 +164,7 @@ namespace Rx.Net.StateMachine.Tests
                     await scope.MakeDefault(true);
                     return await _botFake.SendBotMessage(ctx.BotId, ctx.ChatId, "Hello, please follow steps to pass registration process");
                 })
-                    .PersistMessageId(scope)
+                    .PersistDisposableItem(scope)
                     .Select(_ => new UserModel { Id = ctx.UserId })
                     .Persist(scope, "UserId")
                     .SelectAsync(async user => GetFirstName(await scope.BeginRecursiveScope("FirstName")).Select(firstName =>
@@ -208,10 +209,10 @@ namespace Rx.Net.StateMachine.Tests
             {
                 var ctx = scope.GetContext<UserContext>();
                 return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.BotId, ctx.ChatId, $"Please enter your {displayName}"))
-                    .PersistMessageId(scope)
+                    .PersistDisposableItem(scope)
                     .Persist(scope, $"Ask{stateName}")
                     .StopAndWait().For<BotFrameworkMessage>(scope, "MessageReceived", new BotFrameworkMessageAwaiter(ctx))
-                    .PersistMessageId(scope)
+                    .PersistDisposableItem(scope, m => m.MessageId)
                     .Select(message =>
                     {
                         string text = message.Text;
@@ -220,7 +221,7 @@ namespace Rx.Net.StateMachine.Tests
                             return StateMachineObservableExtensions.Of(message.Text);
 
                         return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.BotId, ctx.ChatId, validationResult.ErrorMessage!))
-                                    .PersistMessageId(scope)
+                                    .PersistDisposableItem(scope)
                                     .Persist(scope, $"Invalid{stateName}")
                                     .IncreaseRecoursionDepth(scope)
                                     .Select(_ => RequestStringInput(scope, displayName, stateName, validate))

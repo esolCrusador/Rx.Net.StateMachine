@@ -90,6 +90,21 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             return MapToSessionStates(sessions);
         }
 
+        public async Task<SessionStateEntity?> GetSessionState(Guid sessionStateId)
+        {
+            var session = await SessionStateDbContext.Set<SessionStateTable<TContext, TContextKey>>()
+                .Include(ss => ss.Context)
+                .Include(ss => ss.Awaiters)
+                .FirstOrDefaultAsync(ss => ss.SessionStateId == sessionStateId);
+
+            if (session == null)
+                return null;
+
+            var e = new SessionStateEntity();
+            Map(session, e);
+            return e;
+        }
+
         private Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> GetAwaitersFilter(IAwaiterHandler<TContext, TContextKey> awaiterHandler, object @event)
         {
             var awaiterIdentifiers = awaiterHandler.GetAwaiterIdTypes()
@@ -178,6 +193,8 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 
             dest.Status = source.Status;
             dest.Result = source.Result;
+            if (dest.Result?.Length > SessionStateTable<TContext, TContextKey>.ResultLength)
+                dest.Result = dest.Result.Substring(0, SessionStateTable<TContext, TContextKey>.ResultLength);
         }
 
         protected IReadOnlyCollection<SessionStateEntity> MapToSessionStates(IEnumerable<SessionStateTable<TContext, TContextKey>> source)

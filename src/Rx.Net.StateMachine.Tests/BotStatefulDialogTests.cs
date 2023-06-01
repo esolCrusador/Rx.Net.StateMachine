@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Rx.Net.StateMachine.Extensions;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Tests.Awaiters;
@@ -258,7 +259,7 @@ namespace Rx.Net.StateMachine.Tests
             public override IObservable<Unit> GetResult(IObservable<ItemWithMessage> input, StateMachineScope scope)
             {
                 var context = scope.GetContext<UserContext>();
-
+                
                 return input.Persist(scope, "Item").Select(item =>
                 {
                     return Observable.FromAsync(() => _botFake.SendButtonsBotMessage(context.BotId, context.ChatId, "Do you want to change name?", item.MessageId,
@@ -266,7 +267,7 @@ namespace Rx.Net.StateMachine.Tests
                         new KeyValuePair<string, string>("No", "no")
                     ))
                     .Persist(scope, "ChangeNameConfirmation")
-                    .PersistMessageId(scope)
+                    .PersistDisposableItem(scope)
                     .Select(messageId =>
                         scope.StopAndWait<BotFrameworkButtonClick>("ChangeNameConfirmationWait", new BotFrameworkButtonClickAwaiter(context, messageId))
                         .Select(click => click.SelectedValue == "yes")
@@ -284,7 +285,7 @@ namespace Rx.Net.StateMachine.Tests
                         return UpdateItemName(item.Item, scope.BeginRecursiveScope("Name"));
                     })
                     .Concat()
-                    .SelectAsync(_ => scope.DeleteMessageIds())
+                    .SelectAsync(_ => scope.DeleteDisposableItems())
                     .Concat();
                 }).Concat();
             }
@@ -298,14 +299,14 @@ namespace Rx.Net.StateMachine.Tests
 
                         return Observable.FromAsync(() =>
                             _botFake.SendBotMessage(context.BotId, context.ChatId, "Please enter name"))
-                                .PersistMessageId(scope)
+                                .PersistDisposableItem(scope)
                                 .Select(messageId =>
                                     scope.StopAndWait<BotFrameworkMessage>("NameInput", new BotFrameworkMessageAwaiter(context))
                                     .Select(nameInput =>
                                     {
                                         if (string.IsNullOrEmpty(nameInput.Text))
                                             return Observable.FromAsync(() => _botFake.SendBotMessage(context.BotId, context.ChatId, "Name is not valid", messageId))
-                                                .PersistMessageId(scope)
+                                                .PersistDisposableItem(scope)
                                                 .Select(_ =>
                                                         UpdateItemName(item, scope.IncreaseRecursionDepth())
                                                 ).Concat();

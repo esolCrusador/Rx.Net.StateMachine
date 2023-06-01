@@ -1,5 +1,6 @@
 ﻿using Rx.Net.StateMachine.Events;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
@@ -57,6 +58,12 @@ namespace Rx.Net.StateMachine.ObservableExtensions
             var whenAnyScope = scope.BeginScope(name);
             return Observable.Merge(observables.Select(obs => obs(whenAnyScope))).Take(1)
                 .TapAsync(() => whenAnyScope.RemoveScopeAwaiters());
+        }
+
+        public static IObservable<IList<TResult>> WhenAll<TSource, TResult>(this IObservable<TSource> source, params Func<TSource, IObservable<TResult>>[] observables)
+        {
+            return source.Select(element => Observable.CombineLatest(observables.Select(obsFactory => obsFactory(element).Take(1))))
+                .Concat();
         }
 
         /// <summary>

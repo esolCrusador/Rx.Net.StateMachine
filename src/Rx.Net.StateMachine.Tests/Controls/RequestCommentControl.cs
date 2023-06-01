@@ -13,6 +13,7 @@ using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Tests.DataAccess;
 using System.Reactive;
 using Rx.Net.StateMachine.Tests.Awaiters;
+using Rx.Net.StateMachine.Extensions;
 
 namespace Rx.Net.StateMachine.Tests.Controls
 {
@@ -36,7 +37,7 @@ namespace Rx.Net.StateMachine.Tests.Controls
         public IObservable<Unit> StartDialog(StateMachineScope scope, TaskMessageContext source, bool mondatory)
         {
             var userContext = scope.GetContext<UserContext>();
-
+            
             return Observable.FromAsync(async () =>
             {
                 await _workflowManagerAccessor.WorkflowManager.RemoveDefaultSesssions(scope.SessionId, userContext.ContextId.ToString());
@@ -44,7 +45,7 @@ namespace Rx.Net.StateMachine.Tests.Controls
 
                 return await _chat.SendBotMessage(userContext.BotId, userContext.ChatId, "Please send message to this chat");
             })
-            .PersistMessageId(scope)
+            .PersistDisposableItem(scope)
             .Persist(scope, "CommentRequested")
             .WhenAny(
                 scope,

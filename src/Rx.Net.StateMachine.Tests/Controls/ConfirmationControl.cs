@@ -1,4 +1,5 @@
-﻿using Rx.Net.StateMachine.ObservableExtensions;
+﻿using Rx.Net.StateMachine.Extensions;
+using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Tests.Awaiters;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
@@ -23,7 +24,7 @@ namespace Rx.Net.StateMachine.Tests.Controls
         }
 
     }
-    public class ConfirmationControl: IControl<DialogConfiguration, bool>
+    public class ConfirmationControl : IControl<DialogConfiguration, bool>
     {
         private readonly ChatFake _chat;
 
@@ -40,15 +41,15 @@ namespace Rx.Net.StateMachine.Tests.Controls
                 userContext.ChatId,
                 source.Message,
                 new KeyValuePair<string, string>(
-                    new WorkflowCallbackQuery { SessionId = scope.SessionId, Command = "confirm", Parameters = { ["value"] = "1" } }.ToString(),
+                    new WorkflowCallbackQuery { Command = "confirm", Parameters = { ["value"] = "1" } }.ToString(),
                     source.YesButton
                 ),
                 new KeyValuePair<string, string>(
-                    new WorkflowCallbackQuery { SessionId = scope.SessionId, Command = "confirm", Parameters = { ["value"] = "0" } }.ToString(),
+                    new WorkflowCallbackQuery { Command = "confirm", Parameters = { ["value"] = "0" } }.ToString(),
                     source.NoButton
                 )
             ))
-            .PersistMessageId(scope)
+            .PersistDisposableItem(scope)
             .Persist(scope, "ConfirmButtonAdded")
             .StopAndWait().For<BotFrameworkButtonClick>(scope, "ConfirmButton", messageId => new BotFrameworkButtonClickAwaiter(userContext, messageId), bc =>
             {

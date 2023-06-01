@@ -37,7 +37,7 @@ namespace Rx.Net.StateMachine
 
         public async Task<StateMachineScope> BeginRecursiveScope(string prefix)
         {
-            string depthName = GetDepthName(prefix);
+            string depthName = GetDepthName(AddPrefix(prefix));
             if (!SessionState.TryGetItem(depthName, StateMachine.SerializerOptions, out int depth))
             {
                 depth = 1;
