@@ -172,7 +172,7 @@ namespace Rx.Net.StateMachine
 
         private static string GetDepthName(string prefix) => $"{prefix}[depth]";
 
-        private int? GetRecoursionDepth()
+        public int? GetRecoursionDepth()
         {
             string depthName = GetDepthName(StatePrefix);
             if (!SessionState.TryGetItem<int>(depthName, StateMachine.SerializerOptions, out var depth))
