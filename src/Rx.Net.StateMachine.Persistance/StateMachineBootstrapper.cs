@@ -19,9 +19,10 @@ namespace Rx.Net.StateMachine.Persistance
         }
 
         public static IServiceCollection AddWorkflow<TWorkflow>(this IServiceCollection services)
-            where TWorkflow: class, IWorkflow
+            where TWorkflow : class, IWorkflow
         {
-            services.AddSingleton<IWorkflow, TWorkflow>();
+            services.AddSingleton<TWorkflow>();
+            services.AddSingleton<IWorkflow>(sp => sp.GetRequiredService<TWorkflow>());
             return services;
         }
     }
