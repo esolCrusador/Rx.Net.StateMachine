@@ -1,4 +1,5 @@
-﻿using Rx.Net.StateMachine.Events;
+﻿using Microsoft.Extensions.Logging;
+using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Helpers;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.States;
@@ -15,14 +16,17 @@ namespace Rx.Net.StateMachine
 {
     public class StateMachine
     {
+        private readonly ILogger<StateMachine> _logger;
+
         public JsonSerializerOptions SerializerOptions { get; }
 
-        public StateMachine() : this(new JsonSerializerOptions())
+        public StateMachine(ILogger<StateMachine> logger) : this(logger, new JsonSerializerOptions())
         {
         }
 
-        public StateMachine(JsonSerializerOptions serializerOptions)
+        public StateMachine(ILogger<StateMachine> logger, JsonSerializerOptions serializerOptions)
         {
+            _logger = logger;
             SerializerOptions = serializerOptions;
         }
 
@@ -115,6 +119,7 @@ namespace Rx.Net.StateMachine
             {
                 sessionState.Status = SessionStateStatus.Failed;
                 sessionState.Result = ex.ToString();
+                _logger.LogError(ex, "Session {SessionId} {WorkflowId} failed", sessionState.SessionStateId, sessionState.WorkflowId);
             }
 
             sessionState.RemoveNotHandledEvents(SerializerOptions);

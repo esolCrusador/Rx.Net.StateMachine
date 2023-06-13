@@ -72,6 +72,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
             services.AddSingleton<MessageQueue>();
             services.AddSingleton<FakeScheduler>();
             services.AddSingleton<GlobalContextState>();
+            services.AddLogging();
             services.AddControls();
 
             services.AddEFStateMachine()
