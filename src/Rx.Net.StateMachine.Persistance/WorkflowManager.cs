@@ -1,4 +1,5 @@
-﻿using Polly;
+﻿using Microsoft.Extensions.Logging;
+using Polly;
 using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Persistance.Entities;
 using Rx.Net.StateMachine.Persistance.Exceptions;
@@ -17,14 +18,16 @@ namespace Rx.Net.StateMachine.Persistance
     {
         private readonly AsyncPolicy _concurrencyRetry = Policy.Handle<ConcurrencyException>()
             .RetryForeverAsync();
+        private readonly ILogger<WorkflowManager<TContext>> _logger;
         private readonly ISessionStateUnitOfWorkFactory _uofFactory;
         private readonly IWorkflowResolver _workflowResolver;
         private readonly IEventAwaiterResolver _eventAwaiterResolver;
 
         public StateMachine StateMachine { get; }
 
-        public WorkflowManager(ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, IEventAwaiterResolver eventAwaiterResolver, StateMachine stateMachine)
+        public WorkflowManager(ILogger<WorkflowManager<TContext>> logger, ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, IEventAwaiterResolver eventAwaiterResolver, StateMachine stateMachine)
         {
+            _logger = logger;
             _uofFactory = uofFactory;
             _workflowResolver = workflowResolver;
             _eventAwaiterResolver = eventAwaiterResolver;
@@ -43,7 +46,12 @@ namespace Rx.Net.StateMachine.Persistance
             return await HandleSessionState(newSessionStateEntity, sessionState, uof);
         }
 
-        public async Task<HandlingResult> StartHandle<TSource>(TSource source, string workflowId, TContext context)
+        public Task<HandlingResult> StartHandle<TSource>(TSource source, string workflowId, TContext context)
+        {
+            return StartHandle<TSource, Unit>(source, workflowId, context);
+        }
+
+        public async Task<HandlingResult> StartHandle<TSource, TResult>(TSource source, string workflowId, TContext context)
         {
             if (context == null)
                 throw new ArgumentNullException("context");
@@ -52,7 +60,7 @@ namespace Rx.Net.StateMachine.Persistance
             var newSessionStateEntity = CreateNewSessionState(workflowId, uof, context);
             var sessionState = ToSessionState(newSessionStateEntity);
 
-            return await StartHandleSessionState(source, newSessionStateEntity, sessionState, context, uof);
+            return await StartHandleSessionState<TSource, TResult>(source, newSessionStateEntity, sessionState, context, uof);
         }
 
         public async Task RemoveDefaultSesssions(Guid? newDefaultSessionId, string userContextId)
@@ -70,6 +78,7 @@ namespace Rx.Net.StateMachine.Persistance
                 await using var uof = _uofFactory.Create();
 
                 var sessionStates = await uof.GetSessionStates(@event);
+                _logger.LogInformation("Found {0} for event {1}", sessionStates.Select(s => s.SessionStateId), @event);
 
                 if (sessionStates.Count == 0)
                     return new List<HandlingResult>();
@@ -77,6 +86,29 @@ namespace Rx.Net.StateMachine.Persistance
                 List<HandlingResult> results = new List<HandlingResult>(sessionStates.Count);
                 foreach (var ss in sessionStates)
                     results.Add(await HandleSessionStateEvent(ss, @event, uof));
+
+                return results;
+            });
+        }
+
+        public Task<List<HandlingResult>> HandleEvents(IReadOnlyCollection<object> events)
+        {
+            if (events.Count == 0)
+                throw new ArgumentException(nameof(events));
+
+            return _concurrencyRetry.ExecuteAsync(async () =>
+            {
+                await using var uof = _uofFactory.Create();
+
+                var sessionStates = await uof.GetSessionStates(events);
+                _logger.LogInformation("Found {0} for events {1}", sessionStates.Select(s => s.SessionStateId), events);
+
+                if (sessionStates.Count == 0)
+                    return new List<HandlingResult>();
+
+                List<HandlingResult> results = new List<HandlingResult>(sessionStates.Count);
+                foreach (var ss in sessionStates)
+                    results.Add(await HandleSessionStateEvents(ss, events, uof));
 
                 return results;
             });
@@ -104,8 +136,23 @@ namespace Rx.Net.StateMachine.Persistance
 
         private async Task<HandlingResult> HandleSessionStateEvent<TEvent>(SessionStateEntity sessionStateEntity, TEvent @event, ISessionStateUnitOfWork uof)
         {
+
             var sessionState = ToSessionState(sessionStateEntity);
             bool isAdded = StateMachine.AddEvent(sessionState, @event, _eventAwaiterResolver.GetEventAwaiters(@event));
+            if (!isAdded)
+                return HandlingResult.Ignored;
+
+            return await HandleSessionState(sessionStateEntity, sessionState, uof);
+        }
+
+        private async Task<HandlingResult> HandleSessionStateEvents(SessionStateEntity sessionStateEntity, IEnumerable<object> events, ISessionStateUnitOfWork uof)
+        {
+
+            var sessionState = ToSessionState(sessionStateEntity);
+            bool isAdded = false;
+            foreach(var @event in events)
+                isAdded = StateMachine.AddEvent(sessionState, @event, _eventAwaiterResolver.GetEventAwaiters(@event)) || isAdded;
+            
             if (!isAdded)
                 return HandlingResult.Ignored;
 
@@ -117,6 +164,7 @@ namespace Rx.Net.StateMachine.Persistance
             var storage = new SessionStateStorage(PersistStrategy.Default, st =>
             {
                 UpdateSessionStateEntity(st, sessionStateEntity);
+                _logger.LogInformation($"Saving changes for {sessionState.SessionStateId}");
                 return uof.Save();
             });
 
@@ -124,15 +172,16 @@ namespace Rx.Net.StateMachine.Persistance
             return await StateMachine.HandleWorkflow(sessionState, storage, workflowFactory);
         }
 
-        private async Task<HandlingResult> StartHandleSessionState<TSource>(TSource source, SessionStateEntity sessionStateEntity, SessionState sessionState, TContext context, ISessionStateUnitOfWork uof)
+        private async Task<HandlingResult> StartHandleSessionState<TSource, TResult>(TSource source, SessionStateEntity sessionStateEntity, SessionState sessionState, TContext context, ISessionStateUnitOfWork uof)
         {
             var storage = new SessionStateStorage(PersistStrategy.Default, st =>
             {
                 UpdateSessionStateEntity(st, sessionStateEntity);
+                _logger.LogInformation($"Saving changes for {sessionState.SessionStateId}");
                 return uof.Save();
             });
 
-            var workflowFactory = await _workflowResolver.GetWorkflow<TSource, Unit>(sessionState.WorkflowId);
+            var workflowFactory = await _workflowResolver.GetWorkflow<TSource, TResult>(sessionState.WorkflowId);
             return await StateMachine.StartHandleWorkflow(source, sessionState, storage, workflowFactory);
         }
 

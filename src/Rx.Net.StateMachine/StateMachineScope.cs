@@ -117,9 +117,9 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
-        public Task AddEvent<TEvent>(TEvent @event, IEnumerable<IEventAwaiter<TEvent>> eventAwaiters)
+        public Task AddEvent(object @event, IEnumerable<IEventAwaiter> eventAwaiters)
         {
-            SessionState.AddEvent<TEvent>(@event, eventAwaiters);
+            SessionState.AddEvent(@event, eventAwaiters);
 
             return SessionStateStorage.PersistEventState(SessionState);
         }

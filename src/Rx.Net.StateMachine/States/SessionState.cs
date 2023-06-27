@@ -138,14 +138,14 @@ namespace Rx.Net.StateMachine.States
                 throw new ItemNotFoundException(itemId);
         }
 
-        internal void ForceAddEvent<TEvent>(TEvent @event)
+        internal void ForceAddEvent(object @event)
         {
             var se = new SessionEvent(@event, GetSequenceNumber(), new SessionEventAwaiter[0]);
 
             _events.Add(se);
         }
 
-        internal bool AddEvent<TEvent>(TEvent @event, IEnumerable<IEventAwaiter<TEvent>> eventAwaiters)
+        internal bool AddEvent(object @event, IEnumerable<IEventAwaiter> eventAwaiters)
         {
             var awaiterIds = eventAwaiters.Select(ea => ea.AwaiterId).ToHashSet();
             var awaiters = _sessionEventAwaiter.Where(e => awaiterIds.Contains(e.Identifier)).ToArray();

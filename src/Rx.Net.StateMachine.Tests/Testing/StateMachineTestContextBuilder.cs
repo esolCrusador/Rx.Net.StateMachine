@@ -108,7 +108,10 @@ namespace Rx.Net.StateMachine.Tests.Testing
         {
             var databaseName = $"TestDatabase-{Guid.NewGuid()}";
 
-            var services = RegisterDefaultServices(gs => new TestSessionStateDbContext(gs, new DbContextOptionsBuilder().UseInMemoryDatabase(databaseName).Options));
+            var services = RegisterDefaultServices(gs => new TestSessionStateDbContext(gs, new DbContextOptionsBuilder()
+                .EnableSensitiveDataLogging()
+                .UseInMemoryDatabase(databaseName).Options)
+            );
             services.AddSingleton(sp => new AsyncWait(TimeSpan.FromMilliseconds(100)));
 
             return new StateMachineTestContextBuilder(services);
@@ -119,6 +122,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
             var databaseName = $"TestDatabase-{Guid.NewGuid()}";
 
             var services = RegisterDefaultServices(gs => new TestSessionStateDbContext(gs, new DbContextOptionsBuilder()
+                    .EnableSensitiveDataLogging()
                     .UseSqlServer("Data Source =.; Integrated Security = True; TrustServerCertificate=True; Initial Catalog=TestDatabase;".Replace("TestDatabase", databaseName))
                     .Options));
             services.AddSingleton(sp => new AsyncWait(TimeSpan.FromSeconds(20)));

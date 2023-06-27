@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Rx.Net.StateMachine.EntityFramework.Awaiters;
 using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.EntityFramework.Extensions;
@@ -85,6 +86,32 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 .Include(ss => ss.Awaiters)
                 .Where(GetAwaitersFilter(awaitHandler, @event))
                 .Where(awaitHandler.GetSessionStateFilter(@event))
+                .ToListAsync();
+
+            return MapToSessionStates(sessions);
+        }
+
+        public async Task<IReadOnlyCollection<SessionStateEntity>> GetSessionStates(IEnumerable<object> events)
+        {
+            var awaitHandlers = events.Select(ev => new KeyValuePair<object, IAwaiterHandler<TContext, TContextKey>>(
+                ev, 
+                EventAwaiterResolver.GetAwaiterHandler(ev.GetType()))
+            );
+            var filterExpression = awaitHandlers.Select(kvp =>
+            {
+                var awaitHandler = kvp.Value;
+                var ev = kvp.Key;
+                return ExpressionExtensions.Aggregate(
+                    (match1, match2) => match1 && match2,
+                    GetAwaitersFilter(awaitHandler, ev),
+                    awaitHandler.GetSessionStateFilter(ev)
+                );
+            }).ToList().Aggregate((match1, match2) => match1 || match2);
+
+            var sessions = await SessionStateDbContext.Set<SessionStateTable<TContext, TContextKey>>()
+                .Include(ss => ss.Context)
+                .Include(ss => ss.Awaiters)
+                .Where(filterExpression)
                 .ToListAsync();
 
             return MapToSessionStates(sessions);

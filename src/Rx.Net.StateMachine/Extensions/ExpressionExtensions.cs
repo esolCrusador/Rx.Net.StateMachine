@@ -11,10 +11,17 @@ namespace Rx.Net.StateMachine.Extensions
             Expression<Func<TResult, TResult, TResult>> resultSelector,
             params Expression<Func<TSource, TResult>>[] expressions)
         {
-            if (expressions.Length < 2)
-                throw new ArgumentException("Please provide at least 2 expressions", nameof(expressions));
+            return Aggregate(expressions, resultSelector);
+        }
 
-            return expressions.Aggregate((Expression<Func<TSource, TResult>>)null,
+        public static Expression<Func<TSource, TResult>> Aggregate<TSource, TResult>(
+            this IReadOnlyList<Expression<Func<TSource, TResult>>> expressions,
+            Expression<Func<TResult, TResult, TResult>> resultSelector)
+        {
+            if (expressions.Count < 2)
+                return expressions[0];
+
+            return expressions.Aggregate((Expression<Func<TSource, TResult>>?)null,
                 (accumulate, expression) =>
                 {
                     if (accumulate == null)
@@ -23,17 +30,17 @@ namespace Rx.Net.StateMachine.Extensions
                     var rebinder = new ExpressionRebinder(new Dictionary<Expression, Expression>
                     {
                         [resultSelector.Parameters[0]] = accumulate.Body,
-                        [resultSelector.Parameters[1]] = expression,
+                        [resultSelector.Parameters[1]] = expression.Body,
                         [expression.Parameters[0]] = accumulate.Parameters[0]
                     });
 
-                    var expressionBody = rebinder.Visit(expression.Body);
+                    var expressionBody = rebinder.Visit(resultSelector.Body);
                     return Expression.Lambda<Func<TSource, TResult>>(
-                        rebinder.Visit(accumulate.Body),
+                        rebinder.Visit(expressionBody),
                         accumulate.Parameters[0]
                     );
                 }
-            );
+            )!;
         }
     }
 }

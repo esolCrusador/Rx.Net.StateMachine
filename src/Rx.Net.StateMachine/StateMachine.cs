@@ -35,6 +35,11 @@ namespace Rx.Net.StateMachine
             return sessionState.AddEvent(@event, eventAwaiters);
         }
 
+        public bool AddEvent(SessionState sessionState, object @event, IEnumerable<IEventAwaiter> eventAwaiters)
+        {
+            return sessionState.AddEvent(@event, eventAwaiters);
+        }
+
         public void ForceAddEvent<TEvent>(SessionState sessionState, TEvent @event)
         {
             sessionState.ForceAddEvent(@event);

@@ -19,7 +19,7 @@ namespace Rx.Net.StateMachine.Extensions
         {
             if (!_eventAwaiterFactories.TryGetValue(awaiterType, out var factory))
                 lock (_eventAwaiterFactories)
-                    if (!_eventAwaiterFactories.TryGetValue(eventType, out factory))
+                    if (!_eventAwaiterFactories.TryGetValue(awaiterType, out factory))
                         _eventAwaiterFactories.Add(awaiterType, factory = CreateAwaiterFactory(awaiterType, eventType));
 
             return factory;

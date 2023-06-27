@@ -1,6 +1,7 @@
 ﻿using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Extensions;
 using Rx.Net.StateMachine.Persistance;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -14,12 +15,18 @@ namespace Rx.Net.StateMachine.EntityFramework.Awaiters
         {
             _awaitHandlerResolver = awaitHandlerResolver;
         }
-        public IEnumerable<IEventAwaiter<TEvent>> GetEventAwaiters<TEvent>(TEvent @event)
+        public IEnumerable<IEventAwaiter<TEvent>> GetEventAwaiters<TEvent>(TEvent @event) =>
+            GetEventAwaiters(@event, typeof(TEvent)).Cast<IEventAwaiter<TEvent>>();
+
+        public IEnumerable<IEventAwaiter> GetEventAwaiters(object @event) =>
+            GetEventAwaiters(@event, @event.GetType());
+
+        private IEnumerable<IEventAwaiter> GetEventAwaiters(object @event, Type eventType)
         {
-            var awaiterHandler = _awaitHandlerResolver.GetAwaiterHandler(typeof(TEvent));
+            var awaiterHandler = _awaitHandlerResolver.GetAwaiterHandler(eventType);
 
             return awaiterHandler.GetAwaiterIdTypes()
-                .Select(t => (IEventAwaiter<TEvent>) AwaiterExtensions.CreateAwaiter(t, @event))
+                .Select(t => (IEventAwaiter)AwaiterExtensions.CreateAwaiter(t, @event))
                 .ToList();
         }
     }

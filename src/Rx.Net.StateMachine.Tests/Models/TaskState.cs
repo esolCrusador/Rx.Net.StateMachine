@@ -4,6 +4,7 @@
     {
         ToDo = 1,
         InProgress,
+        Submiting,
         ReadyForReview,
         Approved
     }
