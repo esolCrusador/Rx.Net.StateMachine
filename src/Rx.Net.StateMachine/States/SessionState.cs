@@ -1,5 +1,6 @@
 ﻿using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Exceptions;
+using Rx.Net.StateMachine.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +11,7 @@ namespace Rx.Net.StateMachine.States
     public class SessionState
     {
         private readonly Dictionary<string, SessionStateStep> _steps;
-        private readonly Dictionary<string, string> _items;
+        private readonly Dictionary<string, object> _items;
         private readonly List<PastSessionEvent> _pastEvents;
         private readonly List<SessionEvent> _events;
         private readonly List<SessionEventAwaiter> _sessionEventAwaiter;
@@ -21,7 +22,7 @@ namespace Rx.Net.StateMachine.States
         public bool IsDefault { get; private set; }
         public object Context { get; private set; }
         public IReadOnlyDictionary<string, SessionStateStep> Steps => _steps;
-        public IReadOnlyDictionary<string, string> Items => _items;
+        public IReadOnlyDictionary<string, object> Items => _items;
         public IReadOnlyCollection<PastSessionEvent> PastEvents => _pastEvents;
         public IReadOnlyCollection<SessionEvent> Events => _events;
         public IReadOnlyCollection<SessionEventAwaiter> SessionEventAwaiters => _sessionEventAwaiter;
@@ -31,7 +32,7 @@ namespace Rx.Net.StateMachine.States
         public SessionStateStatus Status { get; set; }
         public string? Result { get; set; }
 
-        public SessionState(Guid? sessionStateId, string workflowId, object context, bool isDefault, int counter, Dictionary<string, SessionStateStep> steps, Dictionary<string, string> items, List<PastSessionEvent> pastEvents, List<SessionEventAwaiter> sessionEventAwaiter)
+        public SessionState(Guid? sessionStateId, string workflowId, object context, bool isDefault, int counter, Dictionary<string, SessionStateStep> steps, Dictionary<string, object> items, List<PastSessionEvent> pastEvents, List<SessionEventAwaiter> sessionEventAwaiter)
         {
             SessionStateId = sessionStateId;
             WorkflowId = workflowId;
@@ -45,7 +46,7 @@ namespace Rx.Net.StateMachine.States
             _sessionEventAwaiter = sessionEventAwaiter;
         }
 
-        public SessionState(string workflowId, object context) : this(null, workflowId, context, false, 0, new Dictionary<string, SessionStateStep>(), new Dictionary<string, string>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
+        public SessionState(string workflowId, object context) : this(null, workflowId, context, false, 0, new Dictionary<string, SessionStateStep>(), new Dictionary<string, object>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
         {
             Status = SessionStateStatus.InProgress;
         }
@@ -56,8 +57,7 @@ namespace Rx.Net.StateMachine.States
             if (!_steps.TryGetValue(stateId, out var step))
                 return false;
 
-            string stepState = step.State;
-            source = JsonSerializer.Deserialize<TSource>(stepState, options);
+            source = step.State.GetValue<TSource>(options);
             return true;
         }
 
@@ -71,26 +71,25 @@ namespace Rx.Net.StateMachine.States
 
         internal void AddStep<Tsource>(string stateId, Tsource source, JsonSerializerOptions options)
         {
-            if (!_steps.TryAdd(stateId, new SessionStateStep(JsonSerializer.Serialize(source, options), GetSequenceNumber())))
+            if (!_steps.TryAdd(stateId, new SessionStateStep(source, GetSequenceNumber())))
                 throw new DuplicatedStepException(stateId);
         }
 
         internal void AddItem<TItem>(string itemId, TItem item, JsonSerializerOptions options)
         {
-            if (!_items.TryAdd(itemId, JsonSerializer.Serialize(item, options)))
+            if (!_items.TryAdd(itemId, item))
                 throw new DuplicatedItemException(itemId);
         }
 
         internal bool TryUpdateItem<TItem>(string itemId, Func<TItem, TItem> updateAction, JsonSerializerOptions options)
         {
-            if (!_items.TryGetValue(itemId, out var valueSring))
+            if (!_items.TryGetValue(itemId, out var itemValue))
                 return false;
 
-            var value = JsonSerializer.Deserialize<TItem>(valueSring, options);
+            var value = itemValue.GetValue<TItem>(options);
             value = updateAction(value);
 
-            valueSring = JsonSerializer.Serialize(value, options);
-            _items[itemId] = valueSring;
+            _items[itemId] = value;
             return true;
         }
 
@@ -103,7 +102,7 @@ namespace Rx.Net.StateMachine.States
 
         internal void UpdateItem<TItem>(string itemId, TItem item, JsonSerializerOptions options)
         {
-            _items[itemId] = JsonSerializer.Serialize(item, options);
+            _items[itemId] = item;
         }
 
         internal void AddOrUpdateItem<TItem>(string itemId, Func<TItem> createAction, Func<TItem, TItem> updateAction, JsonSerializerOptions options)
@@ -114,13 +113,13 @@ namespace Rx.Net.StateMachine.States
 
         internal bool TryGetItem<TItem>(string itemId, JsonSerializerOptions options, out TItem item)
         {
-            if (!_items.TryGetValue(itemId, out string itemString))
+            if (!_items.TryGetValue(itemId, out object itemValue))
             {
                 item = default;
                 return false;
             }
 
-            item = JsonSerializer.Deserialize<TItem>(itemString, options);
+            item = itemValue.GetValue<TItem>(options);
             return true;
         }
 

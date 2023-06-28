@@ -96,7 +96,7 @@ namespace Rx.Net.StateMachine
                 false,
                 minimalSessionState.Counter,
                 minimalSessionState.Steps ?? new Dictionary<string, SessionStateStep>(),
-                minimalSessionState.Items ?? new Dictionary<string, string>(),
+                minimalSessionState.Items ?? new Dictionary<string, object>(),
                 new List<PastSessionEvent>(),
                 new List<SessionEventAwaiter>()
             );

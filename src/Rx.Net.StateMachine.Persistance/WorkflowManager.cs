@@ -243,7 +243,7 @@ namespace Rx.Net.StateMachine.Persistance
         {
             return events.Select(e => new SessionEventEntity
             {
-                Event = e.SerializedEvent,
+                Event = e.Event,
                 EventType = e.EventType,
                 SequenceNumber = e.SequenceNumber,
                 Awaiters = e.Awaiters,

@@ -7,16 +7,16 @@ namespace Rx.Net.StateMachine.States
     public class PastSessionEvent
     {
         public int SequenceNumber { get; }
-        public string SerializedEvent { get; }
+        public object Event { get; }
         public string EventType { get; }
         public string[] Awaiters { get; }
         public bool Handled { get; }
 
         [JsonConstructor]
-        public PastSessionEvent(int sequenceNumber, string serializedEvent, string eventType, string[] awaiters, bool handled)
+        public PastSessionEvent(int sequenceNumber, object @event, string eventType, string[] awaiters, bool handled)
         {
             SequenceNumber = sequenceNumber;
-            SerializedEvent = serializedEvent;
+            Event = @event;
             EventType = eventType;
             Awaiters = awaiters;
             Handled = handled;
@@ -26,7 +26,7 @@ namespace Rx.Net.StateMachine.States
         {
             SequenceNumber = sessionEvent.SequenceNumber;
             var eventType = sessionEvent.Event.GetType();
-            SerializedEvent = JsonSerializer.Serialize(sessionEvent.Event, eventType, options);
+            Event = sessionEvent.Event;
             EventType = eventType.AssemblyQualifiedName;
             Awaiters = sessionEvent.Awaiters.Select(a => $"{a.AwaiterId:N}-{a.Identifier}-{a.SequenceNumber}").ToArray();
             Handled = sessionEvent.Handled;
