@@ -21,6 +21,8 @@ namespace Rx.Net.StateMachine.EntityFramework.Tables
         [StringLength(ResultLength)] public string? Result { get; set; }
         public TContextKey ContextId { get; set; }
         public TContext Context { get; set; }
+        public DateTimeOffset CrearedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
         [Timestamp] public byte[] ConcurrencyToken { get; set; }
     }
 }

@@ -16,8 +16,7 @@ namespace Rx.Net.StateMachine.Persistance
 {
     public class WorkflowManager<TContext>
     {
-        private readonly AsyncPolicy _concurrencyRetry = Policy.Handle<ConcurrencyException>()
-            .RetryForeverAsync();
+        private readonly AsyncPolicy _concurrencyRetry;
         private readonly ILogger<WorkflowManager<TContext>> _logger;
         private readonly ISessionStateUnitOfWorkFactory _uofFactory;
         private readonly IWorkflowResolver _workflowResolver;
@@ -32,6 +31,8 @@ namespace Rx.Net.StateMachine.Persistance
             _workflowResolver = workflowResolver;
             _eventAwaiterResolver = eventAwaiterResolver;
             StateMachine = stateMachine;
+            _concurrencyRetry = Policy.Handle<ConcurrencyException>()
+                .RetryForeverAsync(ex => _logger.LogWarning(ex.Message));
         }
 
         public async Task<HandlingResult> StartHandle(string workflowId, TContext context)
@@ -78,7 +79,7 @@ namespace Rx.Net.StateMachine.Persistance
                 await using var uof = _uofFactory.Create();
 
                 var sessionStates = await uof.GetSessionStates(@event);
-                _logger.LogInformation("Found {0} for event {1}", sessionStates.Select(s => s.SessionStateId), @event);
+                _logger.LogInformation("Found {SessionIds} for event {Event}", sessionStates.Select(s => s.SessionStateId), @event);
 
                 if (sessionStates.Count == 0)
                     return new List<HandlingResult>();

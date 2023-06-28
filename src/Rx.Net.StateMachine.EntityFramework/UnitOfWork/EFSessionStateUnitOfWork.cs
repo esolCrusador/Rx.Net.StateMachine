@@ -67,7 +67,9 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             var row = new SessionStateTable<TContext, TContextKey>
             {
                 SessionStateId = sessionState.SessionStateId,
-                Awaiters = new()
+                Awaiters = new(),
+                CrearedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow,
             };
             Map(sessionState, row);
             row.ContextId = ContextKeySelector.GetContextKey((TContext)sessionState.Context);
@@ -94,7 +96,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         public async Task<IReadOnlyCollection<SessionStateEntity>> GetSessionStates(IEnumerable<object> events)
         {
             var awaitHandlers = events.Select(ev => new KeyValuePair<object, IAwaiterHandler<TContext, TContextKey>>(
-                ev, 
+                ev,
                 EventAwaiterResolver.GetAwaiterHandler(ev.GetType()))
             );
             var filterExpression = awaitHandlers.Select(kvp =>
@@ -149,13 +151,18 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             foreach (var pair in _loadedSessionStates.Values)
                 Map(pair.SessionState, pair.Row);
 
+            var changedEntities = SessionStateDbContext.ChangeTracker.Entries<SessionStateTable<TContext, TContextKey>>().Where(e => e.State == EntityState.Modified);
+            foreach (var changed in changedEntities)
+                changed.Entity.UpdatedAt = DateTimeOffset.UtcNow;
+
             try
             {
+
                 await SessionStateDbContext.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException ex)
             {
-                throw new ConcurrencyException(ex);
+                throw new ConcurrencyException($"Concurrency during updating {string.Join(", ", _loadedSessionStates.Keys)}", ex);
             }
         }
 
