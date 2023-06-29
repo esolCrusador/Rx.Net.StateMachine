@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reactive;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.Persistance
@@ -79,7 +80,7 @@ namespace Rx.Net.StateMachine.Persistance
                 await using var uof = _uofFactory.Create();
 
                 var sessionStates = await uof.GetSessionStates(@event);
-                _logger.LogInformation("Found {SessionIds} for event {Event}", sessionStates.Select(s => s.SessionStateId), @event);
+                _logger.LogInformation("Found {SessionIds} for event {EventType}\r\n{Event}", sessionStates.Select(s => s.SessionStateId), @event, JsonSerializer.Serialize(@event));
 
                 if (sessionStates.Count == 0)
                     return new List<HandlingResult>();
@@ -102,7 +103,7 @@ namespace Rx.Net.StateMachine.Persistance
                 await using var uof = _uofFactory.Create();
 
                 var sessionStates = await uof.GetSessionStates(events);
-                _logger.LogInformation("Found {0} for events {1}", sessionStates.Select(s => s.SessionStateId), events);
+                _logger.LogInformation("Found {0} for events {EventTypes}\r\n{Events}", sessionStates.Select(s => s.SessionStateId), events, events.Select(ev => JsonSerializer.Serialize(ev)));
 
                 if (sessionStates.Count == 0)
                     return new List<HandlingResult>();
