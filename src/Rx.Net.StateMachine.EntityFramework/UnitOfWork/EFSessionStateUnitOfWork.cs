@@ -157,7 +157,6 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 
             try
             {
-
                 await SessionStateDbContext.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException ex)
