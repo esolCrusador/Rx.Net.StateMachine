@@ -11,19 +11,11 @@ namespace Rx.Net.StateMachine.WorkflowFactories
         public abstract IObservable<Unit> Execute(StateMachineScope scope);
     }
 
-    public abstract class Workflow<TResult> : Workflow, IWorkflow<TResult>
+    public abstract class Workflow<TSource> : Workflow, IWorkflow<TSource>
     {
         public override IObservable<Unit> Execute(StateMachineScope scope) =>
-            GetResult(scope).Select(_ => Unit.Default);
+            Execute(Observable.Empty<TSource>(), scope);
 
-        public abstract IObservable<TResult> GetResult(StateMachineScope scope);
-    }
-
-    public abstract class Workflow<TSource, TResult> : Workflow<TResult>, IWorkflow<TSource, TResult>
-    {
-        public override IObservable<TResult> GetResult(StateMachineScope scope) =>
-            GetResult(Observable.Empty<TSource>(), scope);
-
-        public abstract IObservable<TResult> GetResult(IObservable<TSource> input, StateMachineScope scope);
+        public abstract IObservable<Unit> Execute(IObservable<TSource> input, StateMachineScope scope);
     }
 }

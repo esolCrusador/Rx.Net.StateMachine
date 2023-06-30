@@ -4,12 +4,12 @@ namespace Rx.Net.StateMachine
 {
     public class HandlingResult
     {
-        public Guid SessionId { get; }
+        public Guid? SessionId { get; }
         public HandlingStatus Status { get; }
         public int PassedSteps { get; }
         public HandlingResult(Guid? sessionId, HandlingStatus status, int passedSteps)
         {
-            SessionId = sessionId ?? throw new InvalidOperationException($"SessionId is not initizlied");
+            SessionId = sessionId;
             Status = status;
             PassedSteps = passedSteps;
         }

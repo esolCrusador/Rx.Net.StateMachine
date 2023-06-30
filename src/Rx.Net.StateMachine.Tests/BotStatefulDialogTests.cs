@@ -140,7 +140,7 @@ namespace Rx.Net.StateMachine.Tests
             var context = await _ctx.UserContextRepository.GetUserOrCreateContext(_botId, _chatId, "Boris Sotsky", "esolCrusador");
 
             await _ctx.StateMachine.StartHandleWorkflow(new ItemWithMessage(item, null), context,
-                await _ctx.WorkflowResolver.GetWorkflow<ItemWithMessage, Unit>(TaskActionsWorkflowFactory.Id)
+                await _ctx.WorkflowResolver.GetWorkflow<ItemWithMessage>(TaskActionsWorkflowFactory.Id)
             );
         }
 
@@ -162,7 +162,7 @@ namespace Rx.Net.StateMachine.Tests
         }
 
         // https://www.figma.com/file/JXTrJQklRBTbbGbvhI0taD/Task-Actions-Dialog?node-id=3%3A76
-        class TaskActionsWorkflowFactory : Workflow<ItemWithMessage, Unit>
+        class TaskActionsWorkflowFactory : Workflow<ItemWithMessage>
         {
             private readonly ChatFake _chatFake;
             private readonly ItemsManager _itemsManager;
@@ -180,7 +180,7 @@ namespace Rx.Net.StateMachine.Tests
             public const string Id = "task-actions";
             public override string WorkflowId => Id;
 
-            public override IObservable<Unit> GetResult(IObservable<ItemWithMessage> input, StateMachineScope scope)
+            public override IObservable<Unit> Execute(IObservable<ItemWithMessage> input, StateMachineScope scope)
             {
                 var context = scope.GetContext<UserContext>();
 
@@ -218,7 +218,7 @@ namespace Rx.Net.StateMachine.Tests
                                         break;
                                     }
                                 case "e":
-                                    await _workflowManagerAccessor.WorkflowManager.StartHandle(new ItemWithMessage(item, buttonClick.MessageId), EditItemWorkflowFactory.Id, context);
+                                    await _workflowManagerAccessor.WorkflowManager.Start(context, new ItemWithMessage(item, buttonClick.MessageId)).Workflow<EditItemWorkflowFactory>();
                                     break;
                                 case "d":
                                     {
@@ -242,7 +242,7 @@ namespace Rx.Net.StateMachine.Tests
             }
         }
 
-        class EditItemWorkflowFactory : Workflow<ItemWithMessage, Unit>
+        class EditItemWorkflowFactory : Workflow<ItemWithMessage>
         {
             private readonly ChatFake _botFake;
             private readonly ItemsManager _itemsManager;
@@ -256,7 +256,7 @@ namespace Rx.Net.StateMachine.Tests
             public const string Id = "edit-item";
             public override string WorkflowId => Id;
 
-            public override IObservable<Unit> GetResult(IObservable<ItemWithMessage> input, StateMachineScope scope)
+            public override IObservable<Unit> Execute(IObservable<ItemWithMessage> input, StateMachineScope scope)
             {
                 var context = scope.GetContext<UserContext>();
                 

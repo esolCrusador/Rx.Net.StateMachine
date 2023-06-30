@@ -65,22 +65,22 @@ namespace Rx.Net.StateMachine
             return HandleWorkflowResult(workflow, sessionState, storage);
         }
 
-        public Task<HandlingResult> StartHandleWorkflow<TSource, TResult>(TSource source, object context, IWorkflow<TSource, TResult> workflowFactory)
+        public Task<HandlingResult> StartHandleWorkflow<TSource>(TSource source, object context, IWorkflow<TSource> workflowFactory)
         {
             return StartHandleWorkflow(source, context, SessionStateStorage.Empty, workflowFactory);
         }
 
-        public Task<HandlingResult> StartHandleWorkflow<TSource, TResult>(TSource source, object context, ISessionStateStorage storage, IWorkflow<TSource, TResult> workflowFactory)
+        public Task<HandlingResult> StartHandleWorkflow<TSource>(TSource source, object context, ISessionStateStorage storage, IWorkflow<TSource> workflowFactory)
         {
             var sessionState = new SessionState(workflowFactory.WorkflowId, context);
-            var workflow = workflowFactory.GetResult(StateMachineObservableExtensions.Of(source), new StateMachineScope(this, sessionState, storage));
+            var workflow = workflowFactory.Execute(StateMachineObservableExtensions.Of(source), new StateMachineScope(this, sessionState, storage));
 
             return HandleWorkflowResult(workflow, sessionState, storage);
         }
 
-        public Task<HandlingResult> StartHandleWorkflow<TSource, TResult>(TSource source, SessionState sessionState, ISessionStateStorage storage, IWorkflow<TSource, TResult> workflowFactory)
+        public Task<HandlingResult> StartHandleWorkflow<TSource>(TSource source, SessionState sessionState, ISessionStateStorage storage, IWorkflow<TSource> workflowFactory)
         {
-            var workflow = workflowFactory.GetResult(StateMachineObservableExtensions.Of(source), new StateMachineScope(this, sessionState, storage));
+            var workflow = workflowFactory.Execute(StateMachineObservableExtensions.Of(source), new StateMachineScope(this, sessionState, storage));
 
             return HandleWorkflowResult(workflow, sessionState, storage);
         }

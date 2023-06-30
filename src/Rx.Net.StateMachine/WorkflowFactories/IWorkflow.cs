@@ -9,13 +9,8 @@ namespace Rx.Net.StateMachine.WorkflowFactories
         IObservable<Unit> Execute(StateMachineScope scope);
     }
 
-    public interface IWorkflow<TResult>: IWorkflow
+    public interface IWorkflow<TSource>: IWorkflow
     {
-        IObservable<TResult> GetResult(StateMachineScope scope);
-    }
-
-    public interface IWorkflow<TSource, TResult>: IWorkflow<TResult>
-    {
-        IObservable<TResult> GetResult(IObservable<TSource> input, StateMachineScope scope);
+        IObservable<Unit> Execute(IObservable<TSource> input, StateMachineScope scope);
     }
 }

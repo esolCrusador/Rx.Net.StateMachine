@@ -95,7 +95,7 @@ namespace Rx.Net.StateMachine.Tests
             );
 
             if (string.Equals(message.Text, "/start", StringComparison.OrdinalIgnoreCase))
-                await _ctx.WorkflowManager.StartHandle(SampleWorkflow.Id, userContext);
+                await _ctx.WorkflowManager.Start(userContext).Workflow<SampleWorkflow>();
             else
                 throw new NotSupportedException();
         }

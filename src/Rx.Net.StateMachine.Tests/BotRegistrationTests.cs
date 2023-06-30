@@ -10,6 +10,7 @@ using Rx.Net.StateMachine.WorkflowFactories;
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Reactive;
 using System.Reactive.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -141,13 +142,13 @@ namespace Rx.Net.StateMachine.Tests
             );
 
             if (string.Equals(message.Text, "/start", StringComparison.OrdinalIgnoreCase))
-                await _ctx.WorkflowManager.StartHandle(BotRegistrationWorkflowFactory.Id, userContext);
+                await _ctx.WorkflowManager.Start(userContext).Workflow<BotRegistrationWorkflowFactory>();
             else
                 await _ctx.WorkflowManager.HandleEvent(message);
         }
 
         // Workflow: https://www.figma.com/file/WPqeeRL8EjiH1rzXT1os7o/User-Registration-Case?node-id=0%3A1
-        class BotRegistrationWorkflowFactory : Workflow<UserModel>
+        class BotRegistrationWorkflowFactory : Workflow
         {
             ChatFake _botFake;
 
@@ -156,7 +157,7 @@ namespace Rx.Net.StateMachine.Tests
 
             public BotRegistrationWorkflowFactory(ChatFake botFake) => _botFake = botFake;
 
-            public override IObservable<UserModel> GetResult(StateMachineScope scope)
+            public override IObservable<Unit> Execute(StateMachineScope scope)
             {
                 var ctx = scope.GetContext<UserContext>();
                 return Observable.FromAsync(async () =>
@@ -202,7 +203,8 @@ namespace Rx.Net.StateMachine.Tests
                     {
                         if (isExecuted)
                             await scope.MakeDefault(false);
-                    });
+                    })
+                    .MapToVoid();
             }
 
             private IObservable<string> RequestStringInput(StateMachineScope scope, string displayName, string stateName, Func<string, ValidationResult> validate)

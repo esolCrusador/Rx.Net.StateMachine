@@ -358,9 +358,9 @@ namespace Rx.Net.StateMachine.Tests
             );
 
             if (string.Equals(message.Text, "/start", StringComparison.OrdinalIgnoreCase))
-                await _ctx.WorkflowManager.StartHandle(OnboardingWorkflow.Id, userContext);
+                await _ctx.WorkflowManager.Start(userContext).Workflow<OnboardingWorkflow>();
             else if (string.Equals(message.Text, "/curator", StringComparison.OrdinalIgnoreCase))
-                await _ctx.WorkflowManager.StartHandle(CuratorWorkflow.Id, userContext);
+                await _ctx.WorkflowManager.Start(userContext).Workflow<CuratorWorkflow>();
             else if (string.Equals(message.Text, "/cancel", StringComparison.OrdinalIgnoreCase))
                 await _ctx.WorkflowManager.RemoveDefaultSesssions(null, userContext.ContextId.ToString());
             else
@@ -377,7 +377,7 @@ namespace Rx.Net.StateMachine.Tests
             await _ctx.WorkflowManager.HandleEvent(ev);
         }
 
-        class OnboardingWorkflow : Workflow<Unit, Unit>
+        class OnboardingWorkflow : Workflow
         {
             public const string Id = nameof(OnboardingWorkflow);
 
@@ -394,7 +394,7 @@ namespace Rx.Net.StateMachine.Tests
                 _workflowManagerAccessor = workflowManagerAccessor;
             }
 
-            public override IObservable<Unit> GetResult(IObservable<Unit> input, StateMachineScope scope)
+            public override IObservable<Unit> Execute(StateMachineScope scope)
             {
                 var context = scope.GetContext<UserContext>();
                 return Observable.FromAsync(async () =>
@@ -406,14 +406,14 @@ namespace Rx.Net.StateMachine.Tests
                 {
                     var context = scope.GetContext<UserContext>();
                     var taskId = await _taskRepository.CreateTask("First Task", "Description", context.UserId);
-                    await _workflowManagerAccessor.WorkflowManager.StartHandle(taskId, TaskWorkflow.Id, context);
+                    await _workflowManagerAccessor.WorkflowManager.Start(context, taskId).Workflow<TaskWorkflow>();
                 })
                 .Concat()
                 .MapToVoid();
             }
         }
 
-        class CuratorWorkflow : Workflow<Unit, Unit>
+        class CuratorWorkflow : Workflow
         {
             public const string Id = nameof(CuratorWorkflow);
             private readonly WorkflowManagerAccessor<UserContext> _workflowManagerAccessor;
@@ -427,7 +427,7 @@ namespace Rx.Net.StateMachine.Tests
                 _chat = chat;
             }
 
-            public override IObservable<Unit> GetResult(IObservable<Unit> _, StateMachineScope scope)
+            public override IObservable<Unit> Execute(StateMachineScope scope)
             {
                 var context = scope.GetContext<UserContext>();
                 return Observable.FromAsync(() => _chat.SendBotMessage(context.BotId, context.ChatId, "All new tasks will be sent to you"))
@@ -440,7 +440,7 @@ namespace Rx.Net.StateMachine.Tests
             private IObservable<Unit> HandleNewTask(StateMachineScope scope)
             {
                 return scope.StopAndWait<TaskCreatedEvent>("TaskCreated", TaskCreatedEventAwaiter.Default)
-                    .SelectAsync(tc => _workflowManagerAccessor.WorkflowManager.StartHandle(tc.TaskId, CuratorTaskWorkflow.Id, scope.GetContext<UserContext>()))
+                    .SelectAsync(tc => _workflowManagerAccessor.WorkflowManager.Start(scope.GetContext<UserContext>(), tc.TaskId).Workflow<CuratorTaskWorkflow>())
                     .Concat()
                     .IncreaseRecoursionDepth(scope)
                     .Select(_ => HandleNewTask(scope))
@@ -448,7 +448,7 @@ namespace Rx.Net.StateMachine.Tests
             }
         }
 
-        class CuratorTaskWorkflow : Workflow<int, Unit>
+        class CuratorTaskWorkflow : Workflow<int>
         {
             public const string Id = nameof(CuratorTaskWorkflow);
             private readonly WorkflowManagerAccessor<UserContext> _workflowManagerAccessor;
@@ -462,13 +462,13 @@ namespace Rx.Net.StateMachine.Tests
                 _taskRepository = taskRepository;
             }
 
-            public override IObservable<Unit> GetResult(IObservable<int> input, StateMachineScope scope)
+            public override IObservable<Unit> Execute(IObservable<int> input, StateMachineScope scope)
             {
                 return input.Persist(scope, "TaskCreated")
                     .SelectAsync(async taskId => WhenTaskReady(taskId, await scope.BeginRecursiveScope("TaskReady")))
                     .Concat()
                     .Concat()
-                    .SelectAsync(tc => _workflowManagerAccessor.WorkflowManager.StartHandle(tc.TaskId, TaskWorkflow.Id, scope.GetContext<UserContext>()))
+                    .SelectAsync(tc => _workflowManagerAccessor.WorkflowManager.Start(scope.GetContext<UserContext>(), tc.TaskId).Workflow<TaskWorkflow>())
                     .Concat()
                     .MapToVoid();
             }
@@ -503,7 +503,7 @@ namespace Rx.Net.StateMachine.Tests
             }
         }
 
-        partial class TaskWorkflow : Workflow<int, Unit>
+        partial class TaskWorkflow : Workflow<int>
         {
             private readonly TaskRepository _taskRepository;
             private readonly ChatFake _chat;
@@ -524,7 +524,7 @@ namespace Rx.Net.StateMachine.Tests
             public const string Id = nameof(TaskWorkflow);
             public override string WorkflowId => Id;
 
-            public override IObservable<Unit> GetResult(IObservable<int> input, StateMachineScope scope)
+            public override IObservable<Unit> Execute(IObservable<int> input, StateMachineScope scope)
             {
                 return input.Select(taskId => ShowTask(taskId, scope)).Concat()
                     .Persist(scope, "TaskShown")
