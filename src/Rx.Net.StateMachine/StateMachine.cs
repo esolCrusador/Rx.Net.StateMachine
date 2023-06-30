@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Rx.Net.StateMachine.Events;
+using Rx.Net.StateMachine.Extensions;
 using Rx.Net.StateMachine.Helpers;
 using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.States;
@@ -105,6 +106,7 @@ namespace Rx.Net.StateMachine
         private async Task<HandlingResult> HandleWorkflowResult<TResult>(IObservable<TResult> workflow, SessionState sessionState, ISessionStateStorage storage)
         {
             bool isFinished = default;
+            int initialStepsCount = sessionState.Counter;
 
             try
             {
@@ -131,16 +133,17 @@ namespace Rx.Net.StateMachine
 
             await storage.PersistSessionState(sessionState);
 
-            return sessionState.Status == SessionStateStatus.Failed
-                ? HandlingResult.Failed
+            var status = sessionState.Status == SessionStateStatus.Failed
+                ? HandlingStatus.Failed
                     : isFinished
-                        ? HandlingResult.Finished
-                        : HandlingResult.Handled;
-        }
+                        ? HandlingStatus.Finished
+                        : HandlingStatus.Handled;
 
-        private class WorkflowFinishResult<TResult>
-        {
-            public TResult Result { get; set; }
+            return new HandlingResult(
+                sessionState.SessionStateId,
+                status,
+                sessionState.Counter - initialStepsCount
+            );
         }
     }
 }

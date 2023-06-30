@@ -1,6 +1,23 @@
-﻿namespace Rx.Net.StateMachine
+﻿using System;
+
+namespace Rx.Net.StateMachine
 {
-    public enum HandlingResult
+    public class HandlingResult
+    {
+        public Guid SessionId { get; }
+        public HandlingStatus Status { get; }
+        public int PassedSteps { get; }
+        public HandlingResult(Guid? sessionId, HandlingStatus status, int passedSteps)
+        {
+            SessionId = sessionId ?? throw new InvalidOperationException($"SessionId is not initizlied");
+            Status = status;
+            PassedSteps = passedSteps;
+        }
+        public static HandlingResult Ignored(Guid sessionId) =>
+            new HandlingResult(sessionId, HandlingStatus.Ignored, 0);
+    }
+
+    public enum HandlingStatus
     {
         Handled,
         Finished,
