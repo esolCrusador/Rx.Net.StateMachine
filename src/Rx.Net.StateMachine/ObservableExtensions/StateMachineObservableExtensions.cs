@@ -16,7 +16,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
             {
                 await scope.IncreaseRecursionDepth();
                 return s;
-            }).Concat();
+            });
         }
         public static IObservable<TSource> Persist<TSource>(this IObservable<TSource> source, StateMachineScope scope, string stateId)
         {
@@ -28,7 +28,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
                 await scope.AddStep(stateId, s);
 
                 return s;
-            }).Concat();
+            });
         }
 
         public static IObservable<TSource> PersistBeforePrevious<TSource>(this IObservable<TSource> source, StateMachineScope scope, string stateId, TSource defaultValue = default)
@@ -80,7 +80,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
                     await scope.EventHandled(e);
 
                     return e;
-                }).Concat();
+                });
             }
 
             return Observable.Create<TEvent>(async observer =>

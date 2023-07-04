@@ -63,8 +63,7 @@ namespace Rx.Net.StateMachine.Tests.Controls
 
                         await _chat.DeleteUserMessage(userContext.BotId, userContext.ChatId, message.MessageId);
                         await _showCommentControl.ShowComment(userContext, comment, source.MessageId);
-                    })
-                    .Concat(),
+                    }),
                 (messageId, innerScope) => {
                     if (mondatory)
                         return null;

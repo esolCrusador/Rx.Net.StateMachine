@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
@@ -20,11 +21,15 @@ namespace Rx.Net.StateMachine.ObservableExtensions
 
         public static IObservable<Unit> MapToVoid<TSource>(this IObservable<TSource> source)
         {
+            EnsureNotNestedObservable<TSource>();
+
             return source.Select(s => Unit.Default);
         }
 
         public static IObservable<TResult> MapTo<TSource, TResult>(this IObservable<TSource> source, TResult result)
         {
+            EnsureNotNestedObservable<TSource>();
+
             return source.Select(s => result);
         }
 
@@ -37,6 +42,14 @@ namespace Rx.Net.StateMachine.ObservableExtensions
                 return Observable.Merge(results);
             }).Concat().Take(1)
                 .TapAsync(() => whenAnyScope.RemoveScopeAwaiters());
+        }
+
+        private static void EnsureNotNestedObservable<TSource>()
+        {
+#if DEBUG
+            if (typeof(TSource).IsAssignableFrom(typeof(IObservable<>)))
+                throw new InvalidOperationException($"Maping to void Observable of Observables");
+# endif
         }
     }
 }

@@ -174,7 +174,6 @@ namespace Rx.Net.StateMachine.Tests
                         return user;
                     }))
                     .Concat()
-                    .Concat()
                     .Persist(scope, "FirstName")
                     .Select(async user => GetLastName(await scope.BeginRecursiveScope("LastName")).Select(lastName =>
                     {
@@ -197,7 +196,6 @@ namespace Rx.Net.StateMachine.Tests
 
                         return user;
                     })
-                    .Concat()
                     .DeleteMssages(scope, _botFake)
                     .FinallyAsync(async (isExecuted, el, ex) =>
                     {

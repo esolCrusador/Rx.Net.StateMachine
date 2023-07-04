@@ -408,7 +408,6 @@ namespace Rx.Net.StateMachine.Tests
                     var taskId = await _taskRepository.CreateTask("First Task", "Description", context.UserId);
                     await _workflowManagerAccessor.WorkflowManager.Start(context, taskId).Workflow<TaskWorkflow>();
                 })
-                .Concat()
                 .MapToVoid();
             }
         }
@@ -433,7 +432,6 @@ namespace Rx.Net.StateMachine.Tests
                 return Observable.FromAsync(() => _chat.SendBotMessage(context.BotId, context.ChatId, "All new tasks will be sent to you"))
                     .Persist(scope, "WelcomeMessage")
                     .SelectAsync(async _ => HandleNewTask(await scope.BeginRecursiveScope("TaskCreatedLoop")))
-                    .Concat()
                     .Concat();
             }
 
@@ -441,7 +439,6 @@ namespace Rx.Net.StateMachine.Tests
             {
                 return scope.StopAndWait<TaskCreatedEvent>("TaskCreated", TaskCreatedEventAwaiter.Default)
                     .SelectAsync(tc => _workflowManagerAccessor.WorkflowManager.Start(scope.GetContext<UserContext>(), tc.TaskId).Workflow<CuratorTaskWorkflow>())
-                    .Concat()
                     .IncreaseRecoursionDepth(scope)
                     .Select(_ => HandleNewTask(scope))
                     .Concat();
@@ -467,9 +464,7 @@ namespace Rx.Net.StateMachine.Tests
                 return input.Persist(scope, "TaskCreated")
                     .SelectAsync(async taskId => WhenTaskReady(taskId, await scope.BeginRecursiveScope("TaskReady")))
                     .Concat()
-                    .Concat()
                     .SelectAsync(tc => _workflowManagerAccessor.WorkflowManager.Start(scope.GetContext<UserContext>(), tc.TaskId).Workflow<TaskWorkflow>())
-                    .Concat()
                     .MapToVoid();
             }
 
@@ -487,7 +482,6 @@ namespace Rx.Net.StateMachine.Tests
                         return ta.TaskId == taskId;
                     }).MapTo(taskId)
                 ).SelectAsync(_taskRepository.GetTask)
-                .Concat()
                 .Select(task =>
                 {
                     if (task.State == TaskState.ReadyForReview && task.Comments.Count > 0)
@@ -529,7 +523,6 @@ namespace Rx.Net.StateMachine.Tests
                 return input.Select(taskId => ShowTask(taskId, scope)).Concat()
                     .Persist(scope, "TaskShown")
                     .SelectAsync(async tmc => HandleTask(tmc, await scope.BeginRecursiveScope("TaskEvents")))
-                    .Concat()
                     .Concat();
             }
 
@@ -600,7 +593,7 @@ namespace Rx.Net.StateMachine.Tests
                                 Text = comment.Text,
                                 UserId = comment.UserId
                             }, taskMessageContext.MessageId)
-                        ).Concat().MapToVoid();
+                        ).MapToVoid();
                     }
                 )
                 .IncreaseRecoursionDepth(scope)
@@ -625,7 +618,6 @@ namespace Rx.Net.StateMachine.Tests
             {
                 return StateMachineObservableExtensions.Of(taskId)
                     .SelectAsync(_taskRepository.GetTask)
-                    .Concat()
                     .SelectAsync(async task =>
                     {
                         var context = scope.GetContext<UserContext>();
@@ -640,8 +632,7 @@ namespace Rx.Net.StateMachine.Tests
                             await _showCommentControl.ShowComment(context, c, messageId);
 
                         return new TaskMessageContext { TaskId = taskId, MessageId = messageId };
-                    })
-                    .Concat();
+                    });
             }
 
             private string GetTaskMessage(StateMachineScope scope, TaskModel task)

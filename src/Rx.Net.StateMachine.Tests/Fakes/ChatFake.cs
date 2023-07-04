@@ -45,7 +45,7 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         public HandlerRegistration AddClickHandler(Func<BotFrameworkButtonClick, Task> handleClick)
         {
             IObservable<BotFrameworkButtonClick> buttonClicks = _buttonClicks;
-            var sub = buttonClicks.SelectAsync(async click =>
+            var sub = buttonClicks.SelectTask(async click =>
             {
                 await handleClick(click);
                 _buttonClickHandled.OnNext(click);
@@ -56,7 +56,7 @@ namespace Rx.Net.StateMachine.Tests.Fakes
 
         public HandlerRegistration AddMessageHandler(Func<BotFrameworkMessage, Task> handleMessage)
         {
-            var sub = _userMessages.SelectAsync(async message =>
+            var sub = _userMessages.SelectTask(async message =>
             {
                 await handleMessage(message);
                 _userMessageHandled.OnNext(message);

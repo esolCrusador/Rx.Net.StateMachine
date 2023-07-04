@@ -151,7 +151,6 @@ namespace Rx.Net.StateMachine.Tests
                        (messageId, anyScope) => anyScope.StopAndWait<BotFrameworkButtonClick>("HiButton", new BotFrameworkButtonClickAwaiter(userContext, messageId)).MapToVoid()
                     )
                     .SelectAsync(() => _chat.SendBotMessage(userContext.BotId, userContext.ChatId, "Well Done!"))
-                    .Concat()
                     .MapToVoid();
             }
         }

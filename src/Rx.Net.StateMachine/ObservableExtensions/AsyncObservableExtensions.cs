@@ -8,41 +8,59 @@ namespace Rx.Net.StateMachine.ObservableExtensions
 {
     public static class AsyncObservableExtensions
     {
-        public static IObservable<IObservable<TResult>> SelectAsync<TSource, TResult>(this IObservable<TSource> source, Func<TSource, CancellationToken, Task<TResult>> execute) =>
+        public static IObservable<IObservable<TResult>> SelectTask<TSource, TResult>(this IObservable<TSource> source, Func<TSource, CancellationToken, Task<TResult>> execute) =>
             source.Select(source =>
             {
                 return Observable.FromAsync(cancellation => execute(source, cancellation));
             });
 
-        public static IObservable<IObservable<TResult>> SelectAsync<TSource, TResult>(this IObservable<TSource> source, Func<TSource, Task<TResult>> execute) =>
+        public static IObservable<IObservable<TResult>> SelectTask<TSource, TResult>(this IObservable<TSource> source, Func<TSource, Task<TResult>> execute) =>
             source.Select(source =>
             {
                 return Observable.FromAsync(cancellation => execute(source));
             });
 
-        public static IObservable<IObservable<TResult>> SelectAsync<TSource, TResult>(this IObservable<TSource> source, Func<Task<TResult>> execute) =>
+        public static IObservable<IObservable<TResult>> SelectTask<TSource, TResult>(this IObservable<TSource> source, Func<Task<TResult>> execute) =>
             source.Select(source =>
             {
                 return Observable.FromAsync(cancellation => execute());
             });
 
-        public static IObservable<IObservable<Unit>> SelectAsync<TSource>(this IObservable<TSource> source, Func<TSource, CancellationToken, Task> execute) =>
+        public static IObservable<IObservable<Unit>> SelectTask<TSource>(this IObservable<TSource> source, Func<TSource, CancellationToken, Task> execute) =>
             source.Select(source =>
             {
                 return Observable.FromAsync(cancellation => execute(source, cancellation));
             });
 
-        public static IObservable<IObservable<Unit>> SelectAsync<TSource>(this IObservable<TSource> source, Func<TSource, Task> execute) =>
+        public static IObservable<IObservable<Unit>> SelectTask<TSource>(this IObservable<TSource> source, Func<TSource, Task> execute) =>
             source.Select(source =>
             {
                 return Observable.FromAsync(cancellation => execute(source));
             });
 
-        public static IObservable<IObservable<Unit>> SelectAsync<TSource>(this IObservable<TSource> source, Func<Task> execute) =>
+        public static IObservable<IObservable<Unit>> SelectTask<TSource>(this IObservable<TSource> source, Func<Task> execute) =>
             source.Select(source =>
             {
                 return Observable.FromAsync(cancellation => execute());
             });
+
+        public static IObservable<TResult> SelectAsync<TSource, TResult>(this IObservable<TSource> source, Func<TSource, CancellationToken, Task<TResult>> execute) =>
+            SelectTask(source, execute).Concat();
+
+        public static IObservable<TResult> SelectAsync<TSource, TResult>(this IObservable<TSource> source, Func<TSource, Task<TResult>> execute) =>
+            SelectTask(source, execute).Concat();
+
+        public static IObservable<TResult> SelectAsync<TSource, TResult>(this IObservable<TSource> source, Func<Task<TResult>> execute) =>
+            SelectTask(source, execute).Concat();
+
+        public static IObservable<Unit> SelectAsync<TSource>(this IObservable<TSource> source, Func<TSource, CancellationToken, Task> execute) =>
+            SelectTask(source, execute).Concat();
+
+        public static IObservable<Unit> SelectAsync<TSource>(this IObservable<TSource> source, Func<TSource, Task> execute) =>
+            SelectTask(source, execute).Concat();
+
+        public static IObservable<Unit> SelectAsync<TSource>(this IObservable<TSource> source, Func<Task> execute) =>
+            SelectTask(source, execute).Concat();
 
         public static IObservable<TSource> TapAsync<TSource>(this IObservable<TSource> source, Func<TSource, Task> execute)
         {
@@ -50,7 +68,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
             {
                 await execute(source);
                 return source;
-            }).Concat();
+            });
         }
 
         public static IObservable<TSource> TapAsync<TSource>(this IObservable<TSource> source, Func<Task> execute)
@@ -59,7 +77,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
             {
                 await execute();
                 return source;
-            }).Concat();
+            });
         }
 
         public delegate Task FinallyDelegate<TSource>(bool isExecuted, TSource source, Exception ex);

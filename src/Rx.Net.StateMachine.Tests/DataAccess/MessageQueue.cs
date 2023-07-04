@@ -34,10 +34,13 @@ namespace Rx.Net.StateMachine.Tests.DataAccess
 
         public IDisposable AddEventHandler<TEvent>(Func<TEvent, Task> handler)
         {
-            return _events.Where(ev => ev is TEvent).SelectAsync(async ev =>
+            return _events.Where(ev => ev is TEvent).Select(ev =>
             {
-                await handler((TEvent)ev);
-                _handled.OnNext(ev);
+                return Observable.FromAsync(async () =>
+                {
+                    await handler((TEvent)ev);
+                    _handled.OnNext(ev);
+                });
             }).Merge().Subscribe();
         }
     }

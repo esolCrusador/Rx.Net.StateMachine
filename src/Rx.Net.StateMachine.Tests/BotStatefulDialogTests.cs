@@ -229,8 +229,7 @@ namespace Rx.Net.StateMachine.Tests
                                 default:
                                     throw new NotSupportedException(buttonClick.SelectedValue);
                             }
-                        })
-                        .Concat();
+                        });
                     })
                     .Concat()
                     .Select(_ => Unit.Default);
@@ -285,8 +284,7 @@ namespace Rx.Net.StateMachine.Tests
                         return UpdateItemName(item.Item, scope.BeginRecursiveScope("Name"));
                     })
                     .Concat()
-                    .SelectAsync(_ => scope.DeleteDisposableItems())
-                    .Concat();
+                    .SelectAsync(_ => scope.DeleteDisposableItems());
                 }).Concat();
             }
 
