@@ -66,6 +66,26 @@ namespace Rx.Net.StateMachine.ObservableExtensions
                 .Concat();
         }
 
+        public static IObservable<TResult> Loop<TResult>(this StateMachineScope scope, string prefix, Func<StateMachineScope, IObservable<TResult>> iteration, Func<TResult, bool>? exit = null)
+        {
+            return Observable.FromAsync(async () =>
+                LoopIteration(await scope.BeginRecursiveScope(prefix), iteration, exit)
+            ).Concat();
+        }
+
+        private static IObservable<TResult> LoopIteration<TResult>(StateMachineScope scope, Func<StateMachineScope, IObservable<TResult>> iteration, Func<TResult, bool>? exit = null)
+        {
+            return iteration(scope).Select(r =>
+            {
+                if (exit?.Invoke(r) == true)
+                    return Observable.Start(() => r);
+
+                return Observable.FromAsync(() => scope.IncreaseRecursionDepth())
+                    .Select(_ => LoopIteration(scope, iteration, exit))
+                    .Concat();
+            }).Concat();
+        }
+
         /// <summary>
         /// Starts await for event or triggers it if it is in events queue.
         /// </summary>
