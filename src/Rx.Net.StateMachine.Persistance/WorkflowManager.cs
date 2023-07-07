@@ -111,6 +111,28 @@ namespace Rx.Net.StateMachine.Persistance
             await HandleEvent(new DefaultSessionRemoved { SessionId = newDefaultSessionId, UserContextId = userContextId });
         }
 
+        public async Task CancelSession(Guid sessionId, CancellationReason reason)
+        {
+            var result = await HandleEvent(new SessionCancelled(sessionId, reason));
+            if (result.Count > 1)
+                throw new InvalidOperationException($"Invalid session {sessionId} handled {result.Count} times");
+
+            if (result.Count == 1)
+            {
+                var status = result[0].Status;
+                if (status != HandlingStatus.Ignored)
+                    return;
+            }
+
+            var uof = _uofFactory.Create();
+            var session = await uof.GetSessionState(sessionId) ?? throw new ArgumentException($"Could not find session {sessionId}");
+            session.Status = SessionStateStatus.Cancelled;
+            session.Result = $"Cancelled because {result}";
+            _logger.LogWarning($"Could not finish session {sessionId}. Cancelling...");
+
+            await uof.Save();
+        }
+
         public Task<List<HandlingResult>> HandleEvent<TEvent>(TEvent @event)
         {
             if (@event == null)
@@ -295,7 +317,5 @@ namespace Rx.Net.StateMachine.Persistance
                 Handled = e.Handled
             }).ToList();
         }
-
-
     }
 }

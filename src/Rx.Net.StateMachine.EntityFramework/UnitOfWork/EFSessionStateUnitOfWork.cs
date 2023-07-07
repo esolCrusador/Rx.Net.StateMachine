@@ -129,9 +129,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             if (session == null)
                 return null;
 
-            var e = new SessionStateEntity();
-            Map(session, e);
-            return e;
+            return MapToSessionState(session);
         }
 
         private Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> GetAwaitersFilter(IAwaiterHandler<TContext, TContextKey> awaiterHandler, object @event)
@@ -232,14 +230,16 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 
         protected IReadOnlyCollection<SessionStateEntity> MapToSessionStates(IEnumerable<SessionStateTable<TContext, TContextKey>> source)
         {
-            return source.Select(ss =>
-            {
-                var e = new SessionStateEntity();
-                Map(ss, e);
-                _loadedSessionStates.Add(ss.SessionStateId, new SessionStateData(e, ss));
+            return source.Select(MapToSessionState).ToList();
+        }
 
-                return e;
-            }).ToList();
+        protected SessionStateEntity MapToSessionState(SessionStateTable<TContext, TContextKey> source)
+        {
+            var entity = new SessionStateEntity();
+            Map(source, entity);
+            _loadedSessionStates.Add(source.SessionStateId, new SessionStateData(entity, source));
+
+            return entity;
         }
     }
 }

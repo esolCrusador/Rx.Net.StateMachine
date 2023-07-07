@@ -119,7 +119,7 @@ namespace Rx.Net.StateMachine
                 else
                 {
                     sessionState.Status = SessionStateStatus.Completed;
-                    sessionState.SetResult(isFinished, SerializerOptions);
+                    sessionState.Result = "Finished";
                 }
             }
             catch (Exception ex)

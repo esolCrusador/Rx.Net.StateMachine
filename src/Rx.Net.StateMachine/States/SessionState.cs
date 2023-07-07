@@ -206,11 +206,6 @@ namespace Rx.Net.StateMachine.States
             _events.Clear();
         }
 
-        internal void SetResult(object result, JsonSerializerOptions options)
-        {
-            Result = JsonSerializer.Serialize(result, options);
-        }
-
         internal MinimalSessionState ToMinimalState() => new MinimalSessionState
         {
             WorkflowId = WorkflowId,
