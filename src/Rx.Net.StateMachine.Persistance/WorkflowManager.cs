@@ -127,7 +127,7 @@ namespace Rx.Net.StateMachine.Persistance
             var uof = _uofFactory.Create();
             var session = await uof.GetSessionState(sessionId) ?? throw new ArgumentException($"Could not find session {sessionId}");
             session.Status = SessionStateStatus.Cancelled;
-            session.Result = $"Cancelled because {result}";
+            session.Result = $"Cancelled because {JsonSerializer.Serialize(result)}";
             _logger.LogWarning($"Could not finish session {sessionId}. Cancelling...");
 
             await uof.Save();
