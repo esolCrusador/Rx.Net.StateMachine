@@ -125,6 +125,7 @@ namespace Rx.Net.StateMachine
         }
 
         public Task EventHandled<TEvent>(TEvent e)
+            where TEvent: class
         {
             SessionState.MarkEventAsHandled(e, StateMachine.SerializerOptions);
 

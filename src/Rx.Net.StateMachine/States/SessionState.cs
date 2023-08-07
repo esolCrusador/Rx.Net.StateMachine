@@ -188,6 +188,7 @@ namespace Rx.Net.StateMachine.States
         }
 
         internal void MarkEventAsHandled<TEvent>(TEvent @event, JsonSerializerOptions options)
+            where TEvent: class
         {
             var eventObject = (object)@event;
             var eventState = _events.FirstOrDefault(se => se.Event == eventObject);

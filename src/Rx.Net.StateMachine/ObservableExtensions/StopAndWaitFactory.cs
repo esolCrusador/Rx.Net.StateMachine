@@ -16,6 +16,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
         /// Waits for event and than persists it
         /// </summary>
         public IObservable<TEvent> For<TEvent>(StateMachineScope scope, string eventStateId, IEventAwaiter<TEvent> awaiterId, Func<TEvent, bool> filter = null)
+            where TEvent: class
         {
             return _source.Select(_ => StateMachineObservableExtensions.StopAndWait(scope, eventStateId, awaiterId, filter))
                 .Concat();
@@ -25,6 +26,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
         /// Waits for event and than persists it
         /// </summary>
         public IObservable<TEvent> For<TEvent>(StateMachineScope scope, string eventStateId, Func<TSource, IEventAwaiter<TEvent>> getAwaiterId)
+            where TEvent: class
         {
             return _source.Select(source => StateMachineObservableExtensions.StopAndWait<TEvent>(scope, eventStateId, getAwaiterId(source), null))
                 .Concat();
@@ -34,6 +36,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
         /// Waits for event and than persists it
         /// </summary>
         public IObservable<TEvent> For<TEvent>(StateMachineScope scope, string eventStateId, Func<TSource, IEventAwaiter<TEvent>> getAwaiterId, Func<TEvent, bool> filter = null)
+            where TEvent: class
         {
             return _source.Select(source => StateMachineObservableExtensions.StopAndWait<TEvent>(scope, eventStateId, getAwaiterId(source), filter))
                 .Concat();
@@ -43,6 +46,7 @@ namespace Rx.Net.StateMachine.ObservableExtensions
         /// Waits for event and than persists it
         /// </summary>
         public IObservable<TEvent> For<TEvent>(StateMachineScope scope, string eventStateId, IEventAwaiter<TEvent> awaiterId, Func<TEvent, TSource, bool> filter)
+            where TEvent: class
         {
             if (filter == null)
                 throw new ArgumentNullException(nameof(filter));
