@@ -2,6 +2,7 @@
 using Rx.Net.StateMachine.Exceptions;
 using Rx.Net.StateMachine.Extensions;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -14,7 +15,7 @@ namespace Rx.Net.StateMachine.States
         private readonly Dictionary<string, object> _items;
         private readonly List<PastSessionEvent> _pastEvents;
         private readonly List<SessionEvent> _events;
-        private readonly List<SessionEventAwaiter> _sessionEventAwaiter;
+        private readonly ConcurrentDictionary<string, SessionEventAwaiter> _sessionEventAwaiter;
 
         public Guid? SessionStateId { get; }
         public string WorkflowId { get; private set; }
@@ -25,7 +26,7 @@ namespace Rx.Net.StateMachine.States
         public IReadOnlyDictionary<string, object> Items => _items;
         public IReadOnlyCollection<PastSessionEvent> PastEvents => _pastEvents;
         public IReadOnlyCollection<SessionEvent> Events => _events;
-        public IReadOnlyCollection<SessionEventAwaiter> SessionEventAwaiters => _sessionEventAwaiter;
+        public IEnumerable<SessionEventAwaiter> SessionEventAwaiters => _sessionEventAwaiter.Values;
 
         public bool Changed { get; private set; } = false;
 
@@ -43,7 +44,9 @@ namespace Rx.Net.StateMachine.States
             _items = items;
             _pastEvents = pastEvents;
             _events = new List<SessionEvent>();
-            _sessionEventAwaiter = sessionEventAwaiter;
+            _sessionEventAwaiter = new ConcurrentDictionary<string, SessionEventAwaiter>(
+                sessionEventAwaiter.Select(aw => new KeyValuePair<string, SessionEventAwaiter>(aw.Name, aw))
+            );
         }
 
         public SessionState(string workflowId, object context) : this(null, workflowId, context, false, 0, new Dictionary<string, SessionStateStep>(), new Dictionary<string, object>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
@@ -147,7 +150,7 @@ namespace Rx.Net.StateMachine.States
         internal bool AddEvent(object @event, IEnumerable<IEventAwaiter> eventAwaiters)
         {
             var awaiterIds = eventAwaiters.Select(ea => ea.AwaiterId).ToHashSet();
-            var awaiters = _sessionEventAwaiter.Where(e => awaiterIds.Contains(e.Identifier)).ToArray();
+            var awaiters = _sessionEventAwaiter.Values.Where(e => awaiterIds.Contains(e.Identifier)).ToArray();
             if (awaiters.Length == 0)
                 return false;
 
@@ -169,8 +172,7 @@ namespace Rx.Net.StateMachine.States
 
         internal void AddEventAwaiter<TEvent>(string stateId, IEventAwaiter<TEvent> eventAwaiter)
         {
-            if (!_sessionEventAwaiter.Any(aw => aw.Name == stateId))
-                _sessionEventAwaiter.Add(new SessionEventAwaiter(stateId, eventAwaiter, GetSequenceNumber()));
+            _sessionEventAwaiter.TryAdd(stateId, new SessionEventAwaiter(stateId, eventAwaiter, GetSequenceNumber()));
         }
 
         internal void MakeDefault(bool isDefault)
@@ -180,7 +182,9 @@ namespace Rx.Net.StateMachine.States
 
         internal void RemoveEventAwaiters(string prefix)
         {
-            _sessionEventAwaiter.RemoveAll(aw => aw.Name.StartsWith(prefix));
+            var keysToRemove = _sessionEventAwaiter.Keys.Where(k => k.StartsWith(prefix));
+            foreach (var key in keysToRemove)
+                _sessionEventAwaiter.Remove(key, out var _);
         }
 
         internal void MarkEventAsHandled<TEvent>(TEvent @event, JsonSerializerOptions options)
@@ -194,7 +198,7 @@ namespace Rx.Net.StateMachine.States
             _pastEvents.Add(new PastSessionEvent(eventState, options));
 
             foreach (var awaiter in eventState.Awaiters)
-                _sessionEventAwaiter.Remove(awaiter);
+                _sessionEventAwaiter.Remove(awaiter.Name, out var _);
             _events.Remove(eventState);
         }
 
