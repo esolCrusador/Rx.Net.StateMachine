@@ -7,6 +7,7 @@ namespace Rx.Net.StateMachine.Persistance
     public static class StateMachineBootstrapper
     {
         public static IServiceCollection AddStateMachine<TContext>(this IServiceCollection services, JsonSerializerOptions? jsonSerializerOptions = null)
+            where TContext: class
         {
             if (jsonSerializerOptions != null)
                 services.AddSingleton(jsonSerializerOptions);

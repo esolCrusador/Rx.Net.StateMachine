@@ -1,6 +1,5 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
-using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Tests.DataAccess;
 using Rx.Net.StateMachine.Tests.Fakes;
@@ -18,6 +17,7 @@ using Xunit;
 using Rx.Net.StateMachine.Tests.Events;
 using Rx.Net.StateMachine.Tests.Controls;
 using Rx.Net.StateMachine.Tests.Awaiters;
+using Rx.Net.StateMachine.Flow;
 
 namespace Rx.Net.StateMachine.Tests
 {
@@ -373,6 +373,7 @@ namespace Rx.Net.StateMachine.Tests
         }
 
         private async Task HandleEvent<TEvent>(TEvent ev)
+            where TEvent: class
         {
             await _ctx.WorkflowManager.HandleEvent(ev);
         }
@@ -394,15 +395,15 @@ namespace Rx.Net.StateMachine.Tests
                 _workflowManagerAccessor = workflowManagerAccessor;
             }
 
-            public override IObservable<Unit> Execute(StateMachineScope scope)
+            public override IFlow<Unit> Execute(IFlow<Unit> flow)
             {
-                var context = scope.GetContext<UserContext>();
-                return Observable.FromAsync(async () =>
+                var context = flow.Scope.GetContext<UserContext>();
+                return flow.SelectAsync(async () =>
                 {
                     return await _chat.SendButtonsBotMessage(context.BotId, context.ChatId, "Hi", new KeyValuePair<string, string>("Hi", "Hi"));
-                }).Persist(scope, "WelcomeMessage")
-                .StopAndWait().For<BotFrameworkButtonClick>(scope, "Hi", messageId => new BotFrameworkButtonClickAwaiter(context, messageId))
-                .SelectAsync(async () =>
+                }).Persist("WelcomeMessage")
+                .StopAndWait().For<BotFrameworkButtonClick>("Hi", messageId => new BotFrameworkButtonClickAwaiter(context, messageId))
+                .SelectAsync(async (_, scope) =>
                 {
                     var context = scope.GetContext<UserContext>();
                     var taskId = await _taskRepository.CreateTask("First Task", "Description", context.UserId);
@@ -426,22 +427,20 @@ namespace Rx.Net.StateMachine.Tests
                 _chat = chat;
             }
 
-            public override IObservable<Unit> Execute(StateMachineScope scope)
+            public override IFlow<Unit> Execute(IFlow<Unit> input)
             {
-                var context = scope.GetContext<UserContext>();
-                return Observable.FromAsync(() => _chat.SendBotMessage(context.BotId, context.ChatId, "All new tasks will be sent to you"))
-                    .Persist(scope, "WelcomeMessage")
-                    .SelectAsync(async _ => HandleNewTask(await scope.BeginRecursiveScope("TaskCreatedLoop")))
-                    .Concat();
+                var context = input.Scope.GetContext<UserContext>();
+                return input.SelectAsync(() => _chat.SendBotMessage(context.BotId, context.ChatId, "All new tasks will be sent to you"))
+                    .Persist("WelcomeMessage")
+                    .SelectAsync(async (_, scope) => HandleNewTask(await scope.BeginRecursiveScope("TaskCreatedLoop")));
             }
 
-            private IObservable<Unit> HandleNewTask(StateMachineScope scope)
+            private IFlow<Unit> HandleNewTask(StateMachineScope scope)
             {
                 return scope.StopAndWait<TaskCreatedEvent>("TaskCreated", TaskCreatedEventAwaiter.Default)
                     .SelectAsync(tc => _workflowManagerAccessor.WorkflowManager.Start(scope.GetContext<UserContext>(), tc.TaskId).Workflow<CuratorTaskWorkflow>())
-                    .IncreaseRecoursionDepth(scope)
-                    .Select(_ => HandleNewTask(scope))
-                    .Concat();
+                    .IncreaseRecoursionDepth()
+                    .Select(_ => HandleNewTask(scope));
             }
         }
 
@@ -459,25 +458,23 @@ namespace Rx.Net.StateMachine.Tests
                 _taskRepository = taskRepository;
             }
 
-            public override IObservable<Unit> Execute(IObservable<int> input, StateMachineScope scope)
+            public override IFlow<Unit> Execute(IFlow<int> input)
             {
-                return input.Persist(scope, "TaskCreated")
-                    .SelectAsync(async taskId => WhenTaskReady(taskId, await scope.BeginRecursiveScope("TaskReady")))
-                    .Concat()
-                    .SelectAsync(tc => _workflowManagerAccessor.WorkflowManager.Start(scope.GetContext<UserContext>(), tc.TaskId).Workflow<TaskWorkflow>())
+                return input.Persist("TaskCreated")
+                    .SelectAsync(async (taskId, scope) => WhenTaskReady(taskId, await scope.BeginRecursiveScope("TaskReady")))
+                    .SelectAsync((tc, scope) => _workflowManagerAccessor.WorkflowManager.Start(scope.GetContext<UserContext>(), tc.TaskId).Workflow<TaskWorkflow>())
                     .MapToVoid();
             }
 
-            private IObservable<TaskModel> WhenTaskReady(int taskId, StateMachineScope scope)
+            private IFlow<TaskModel> WhenTaskReady(int taskId, StateMachineScope scope)
             {
-                return StateMachineObservableExtensions.Of(taskId).WhenAny(
-                    scope,
+                return scope.StartFlow(taskId).WhenAny(
                     "TaskReady",
-                    (taskId, innerScope) => innerScope.StopAndWait<TaskStateChanged>("StateChange", new TaskStateChangedAwaiter(taskId), (tsc) =>
+                    inner => inner.StopAndWait().For<TaskStateChanged>("StateChange", taskId => new TaskStateChangedAwaiter(taskId), (tsc) =>
                     {
                         return tsc.TaskId == taskId && tsc.State == TaskState.ReadyForReview;
                     }).MapTo(taskId),
-                    (taskId, innerScope) => innerScope.StopAndWait<TaskCommentAdded>("CommentAdded", new TaskCommentAddedAwaiter(taskId), (ta) =>
+                    inner => inner.StopAndWait().For<TaskCommentAdded>("CommentAdded", taskId => new TaskCommentAddedAwaiter(taskId), (ta) =>
                     {
                         return ta.TaskId == taskId;
                     }).MapTo(taskId)
@@ -485,15 +482,13 @@ namespace Rx.Net.StateMachine.Tests
                 .Select(task =>
                 {
                     if (task.State == TaskState.ReadyForReview && task.Comments.Count > 0)
-                        return StateMachineObservableExtensions.Of(task);
+                        return scope.StartFlow(task);
 
-                    return StateMachineObservableExtensions.Of(task.TaskId)
-                        .Persist(scope, "TaskNotReady")
-                        .IncreaseRecoursionDepth(scope)
-                        .Select(taskId => WhenTaskReady(taskId, scope))
-                        .Concat();
-                })
-                .Concat();
+                    return scope.StartFlow(task.TaskId)
+                        .Persist("TaskNotReady")
+                        .IncreaseRecoursionDepth()
+                        .Select(taskId => WhenTaskReady(taskId, scope));
+                });
             }
         }
 
@@ -518,15 +513,14 @@ namespace Rx.Net.StateMachine.Tests
             public const string Id = nameof(TaskWorkflow);
             public override string WorkflowId => Id;
 
-            public override IObservable<Unit> Execute(IObservable<int> input, StateMachineScope scope)
+            public override IFlow<Unit> Execute(IFlow<int> input)
             {
-                return input.Select(taskId => ShowTask(taskId, scope)).Concat()
-                    .Persist(scope, "TaskShown")
-                    .SelectAsync(async tmc => HandleTask(tmc, await scope.BeginRecursiveScope("TaskEvents")))
-                    .Concat();
+                return input.Select((taskId, scope) => ShowTask(taskId, scope))
+                    .Persist("TaskShown")
+                    .SelectAsync(async (tmc, scope) => HandleTask(tmc, await scope.BeginRecursiveScope("TaskEvents")));
             }
 
-            private IObservable<Unit> HandleTask(TaskMessageContext taskMessageContext, StateMachineScope scope)
+            private IFlow<Unit> HandleTask(TaskMessageContext taskMessageContext, StateMachineScope scope)
             {
                 return scope.WhenAny(
                     "TaskEvents",
@@ -542,38 +536,36 @@ namespace Rx.Net.StateMachine.Tests
                                     case "cs":
                                         {
                                             var state = (TaskState)int.Parse(query.Parameters!["s"]);
-                                            return Observable.FromAsync(() => _taskRepository.UpdateTaskState(
+                                            return scope.StartFlow(() => _taskRepository.UpdateTaskState(
                                                 taskMessageContext.TaskId,
                                                 state,
                                                 new Dictionary<string, string>
                                                 {
                                                     ["SessionId"] = scope.SessionId.ToString("n")
                                                 })
-                                           ).Persist(scope, "StateUpdated")
+                                           ).Persist("StateUpdated")
                                            .Select(task =>
                                            {
                                                return UpdateTask(taskMessageContext.MessageId, task, scope, false)
                                                 .MapTo(task);
                                            })
-                                           .Concat()
-                                           .Persist(scope, "RemovedTaskButtons")
+                                           .Persist("RemovedTaskButtons")
                                            .Select(task =>
                                            {
                                                return (task.Comments.Count != 0 ? _confirmationControl.StartDialog(
                                                                                                   scope.BeginScope("ConfirmComment"),
                                                                                                   new DialogConfiguration("Do you want to add comment with result?")
                                                                                                )
-                                               : StateMachineObservableExtensions.Of(true))
+                                               : scope.StartFlow(true))
                                                 .Select(addComment =>
                                                 {
                                                     if (addComment)
                                                         return _requestComment.StartDialog(scope.BeginScope("FinalComment"), taskMessageContext, task.Comments.Count == 0);
 
-                                                    return StateMachineObservableExtensions.Of(Unit.Default);
-                                                }).Concat()
-                                                .Select(_ => UpdateTask(taskMessageContext.MessageId, task, scope, true))
-                                                .Concat();
-                                           }).Concat();
+                                                    return scope.StartFlow();
+                                                })
+                                                .Select(_ => UpdateTask(taskMessageContext.MessageId, task, scope, true));
+                                           });
                                         }
                                     case "c":
                                         {
@@ -582,7 +574,7 @@ namespace Rx.Net.StateMachine.Tests
                                     default:
                                         throw new NotSupportedException($"Not supported command {query.Command} workflow {scope.SessionId}");
                                 };
-                            }).Concat();
+                            });
                     },
                     innerScope =>
                     {
@@ -596,15 +588,14 @@ namespace Rx.Net.StateMachine.Tests
                         ).MapToVoid();
                     }
                 )
-                .IncreaseRecoursionDepth(scope)
+                .IncreaseRecoursionDepth()
                 .Select(_ => HandleTask(taskMessageContext, scope))
-                .Concat()
                 .MapToVoid();
             }
 
-            private IObservable<Unit> UpdateTask(int messageId, TaskModel? task, StateMachineScope scope, bool showButtons)
+            private IFlow<Unit> UpdateTask(int messageId, TaskModel? task, StateMachineScope scope, bool showButtons)
             {
-                return Observable.FromAsync(async () =>
+                return scope.StartFlow(async () =>
                 {
                     var userContext = scope.GetContext<UserContext>();
                     if (task != null)
@@ -614,9 +605,9 @@ namespace Rx.Net.StateMachine.Tests
                 });
             }
 
-            private IObservable<TaskMessageContext> ShowTask(int taskId, StateMachineScope scope)
+            private IFlow<TaskMessageContext> ShowTask(int taskId, StateMachineScope scope)
             {
-                return StateMachineObservableExtensions.Of(taskId)
+                return scope.StartFlow(taskId)
                     .SelectAsync(_taskRepository.GetTask)
                     .SelectAsync(async task =>
                     {

@@ -1,5 +1,4 @@
-﻿using Rx.Net.StateMachine.ObservableExtensions;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -45,22 +44,22 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         public HandlerRegistration AddClickHandler(Func<BotFrameworkButtonClick, Task> handleClick)
         {
             IObservable<BotFrameworkButtonClick> buttonClicks = _buttonClicks;
-            var sub = buttonClicks.SelectTask(async click =>
+            var sub = buttonClicks.Select(async click =>
             {
                 await handleClick(click);
                 _buttonClickHandled.OnNext(click);
-            }).Merge().Subscribe();
+            }).Select(t => t.ToObservable()).Merge().Subscribe();
 
             return new HandlerRegistration(sub);
         }
 
         public HandlerRegistration AddMessageHandler(Func<BotFrameworkMessage, Task> handleMessage)
         {
-            var sub = _userMessages.SelectTask(async message =>
+            var sub = _userMessages.Select(async message =>
             {
                 await handleMessage(message);
                 _userMessageHandled.OnNext(message);
-            }).Merge().Subscribe();
+            }).Select(t => t.ToObservable()).Merge().Subscribe();
 
             return new HandlerRegistration(sub);
         }

@@ -2,7 +2,6 @@
 using Rx.Net.StateMachine.Tests.Persistence;
 using Rx.Net.StateMachine.Tests.Testing;
 using Rx.Net.StateMachine.WorkflowFactories;
-using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Extensions;
 using System;
 using System.Collections.Generic;
@@ -16,6 +15,7 @@ using Rx.Net.StateMachine.Tests.Events;
 using Rx.Net.StateMachine.EntityFramework.Tables;
 using Microsoft.EntityFrameworkCore;
 using Rx.Net.StateMachine.Tests.Awaiters;
+using Rx.Net.StateMachine.Flow;
 
 namespace Rx.Net.StateMachine.Tests
 {
@@ -106,6 +106,7 @@ namespace Rx.Net.StateMachine.Tests
         }
 
         private async Task HandleEvent<TEvent>(TEvent ev)
+            where TEvent: class
         {
             await _ctx.WorkflowManager.HandleEvent(ev);
         }
@@ -124,20 +125,19 @@ namespace Rx.Net.StateMachine.Tests
                 _scheduler = scheduler;
             }
 
-            public override IObservable<Unit> Execute(StateMachineScope scope)
+            public override IFlow<Unit> Execute(IFlow<Unit> input)
             {
-                var userContext = scope.GetContext<UserContext>();
-                return Observable.FromAsync(() => _chat.SendButtonsBotMessage(
+                var userContext = input.Scope.GetContext<UserContext>();
+                return input.SelectAsync((_, scope) => _chat.SendButtonsBotMessage(
                     userContext.BotId,
                     userContext.ChatId,
                     "Hi",
                     new KeyValuePair<string, string>(new WorkflowCallbackQuery { SessionId = scope.SessionState.SessionStateId, Command = "next" }.ToString(), "Hi")
                     ))
-                    .Persist(scope, "HiMessage")
+                    .Persist("HiMessage")
                     .WhenAny(
-                        scope,
                         "HiAwaiter",
-                        (messageId, anyScope) => Observable.FromAsync(async () =>
+                        flow => flow.SelectAsync(async (_, anyScope) =>
                         {
                             var ev = new TimeoutEvent
                             {
@@ -147,8 +147,8 @@ namespace Rx.Net.StateMachine.Tests
                             await _scheduler.ScheduleEvent(ev, TimeSpan.FromSeconds(30));
 
                             return ev.EventId;
-                        }).Persist(anyScope, "Timeout1").StopAndWait().For<TimeoutEvent>(anyScope, "FirstTimeoutEvent", eventId => new TimeoutEventAwaiter(eventId)).MapToVoid(),
-                       (messageId, anyScope) => anyScope.StopAndWait<BotFrameworkButtonClick>("HiButton", new BotFrameworkButtonClickAwaiter(userContext, messageId)).MapToVoid()
+                        }).Persist("Timeout1").StopAndWait().For<TimeoutEvent>("FirstTimeoutEvent", eventId => new TimeoutEventAwaiter(eventId)).MapToVoid(),
+                       flow => flow.StopAndWait().For<BotFrameworkButtonClick>("HiButton", messageId => new BotFrameworkButtonClickAwaiter(userContext, messageId)).MapToVoid()
                     )
                     .SelectAsync(() => _chat.SendBotMessage(userContext.BotId, userContext.ChatId, "Well Done!"))
                     .MapToVoid();

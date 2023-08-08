@@ -5,9 +5,9 @@ namespace Rx.Net.StateMachine.Tests.Fakes
     public class UserInfo
     {
         public long UserId { get; set; }
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
-        public string Username { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? Username { get; set; }
 
         public string Name
         {

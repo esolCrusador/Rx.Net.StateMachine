@@ -1,4 +1,4 @@
-﻿using Rx.Net.StateMachine.ObservableExtensions;
+﻿using Rx.Net.StateMachine.Flow;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,10 +8,9 @@ namespace Rx.Net.StateMachine.Extensions
 {
     public static class DisposableItemsExtensions
     {
-        public static IObservable<TItemId> PersistDisposableItem<TItemId>(this IObservable<TItemId> items, StateMachineScope scope, string messagesCollectition = "Messages")
+        public static IFlow<TItemId> PersistDisposableItem<TItemId>(this IFlow<TItemId> items, string messagesCollectition = "Messages")
         {
-            return items
-                .TapAsync(messageId => scope.PersistDisposableItem(messageId, messagesCollectition));
+            return items.TapAsync((messageId, scope) => scope.PersistDisposableItem(messageId, messagesCollectition));
         }
 
         public static Task PersistDisposableItem<TItemId>(this StateMachineScope scope, TItemId messageId, string messagesCollectition = "Messages")
@@ -23,9 +22,9 @@ namespace Rx.Net.StateMachine.Extensions
             });
         }
 
-        public static IObservable<TItem> PersistDisposableItem<TItem, TItemId>(this IObservable<TItem> messageObservable, StateMachineScope scope, Func<TItem, TItemId> idSelector, string messagesCollectition = "Messages")
+        public static IFlow<TItem> PersistDisposableItem<TItem, TItemId>(this IFlow<TItem> messagesFlow, Func<TItem, TItemId> idSelector, string messagesCollectition = "Messages")
         {
-            return messageObservable.TapAsync(message =>
+            return messagesFlow.TapAsync((message, scope) =>
                 scope.PersistDisposableItem(message, idSelector, messagesCollectition)
             );
         }
@@ -39,7 +38,7 @@ namespace Rx.Net.StateMachine.Extensions
             });
         }
 
-        public static List<TItemId> GetDisposableItems<TItemId>(this StateMachineScope scope, string collectionName = "Messages")
+        public static List<TItemId>? GetDisposableItems<TItemId>(this StateMachineScope scope, string collectionName = "Messages")
         {
             return scope.GetItem<List<TItemId>>(collectionName);
         }
@@ -49,14 +48,14 @@ namespace Rx.Net.StateMachine.Extensions
             return scope.DeleteItem(collectionName);
         }
 
-        public static IObservable<TSource> DisposeItems<TSource, TItemId>(this IObservable<TSource> source, StateMachineScope scope, Func<IEnumerable<TItemId>, Task> disposeItems, string collectionName = "Messages")
+        public static IFlow<TSource> DisposeItems<TSource, TItemId>(this IFlow<TSource> source, Func<IEnumerable<TItemId>, Task> disposeItems, string collectionName = "Messages")
         {
-            return source.FinallyAsync(async (isExecuted, source, ex) =>
+            return source.FinallyAsync(async (isExecuted, s, ex) =>
             {
                 if (!isExecuted)
                     return;
 
-                var allMessages = scope.GetItems<List<TItemId>>(collectionName);
+                var allMessages = source.Scope.GetItems<List<TItemId>>(collectionName);
 
                 await disposeItems(allMessages.SelectMany(messages => messages));
             });

@@ -6,7 +6,7 @@ namespace Rx.Net.StateMachine.Persistance.Entities
 {
     public class SessionItemEntity
     {
-        public string Id { get; set; }
-        public object Value { get; set; }
+        public required string Id { get; set; }
+        public object? Value { get; set; }
     }
 }

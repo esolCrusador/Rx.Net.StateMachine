@@ -1,14 +1,11 @@
 ﻿using Rx.Net.StateMachine.Extensions;
-using Rx.Net.StateMachine.ObservableExtensions;
+using Rx.Net.StateMachine.Flow;
 using Rx.Net.StateMachine.Tests.Awaiters;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
 using Rx.Net.StateMachine.Tests.Persistence;
-using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Reactive.Linq;
-using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.Tests.Controls
 {
@@ -33,10 +30,10 @@ namespace Rx.Net.StateMachine.Tests.Controls
             _chat = chat;
         }
 
-        public IObservable<bool> StartDialog(StateMachineScope scope, DialogConfiguration source)
+        public IFlow<bool> StartDialog(StateMachineScope scope, DialogConfiguration source)
         {
             var userContext = scope.GetContext<UserContext>();
-            return Observable.FromAsync(() => _chat.SendButtonsBotMessage(
+            return scope.StartFlow(() => _chat.SendButtonsBotMessage(
                 userContext.BotId,
                 userContext.ChatId,
                 source.Message,
@@ -49,9 +46,9 @@ namespace Rx.Net.StateMachine.Tests.Controls
                     source.NoButton
                 )
             ))
-            .PersistDisposableItem(scope)
-            .Persist(scope, "ConfirmButtonAdded")
-            .StopAndWait().For<BotFrameworkButtonClick>(scope, "ConfirmButton", messageId => new BotFrameworkButtonClickAwaiter(userContext, messageId), bc =>
+            .PersistDisposableItem()
+            .Persist("ConfirmButtonAdded")
+            .StopAndWait().For<BotFrameworkButtonClick>("ConfirmButton", messageId => new BotFrameworkButtonClickAwaiter(userContext, messageId), bc =>
             {
                 var query = WorkflowCallbackQuery.Parse(bc.SelectedValue);
                 return query.Command == "confirm";
@@ -61,8 +58,8 @@ namespace Rx.Net.StateMachine.Tests.Controls
                 var query = WorkflowCallbackQuery.Parse(bc.SelectedValue);
                 return query.Parameters["value"] == "1";
             })
-            .DeleteMssages(scope, _chat)
-            .Persist(scope, "ConfirmationResult");
+            .DeleteMssages(_chat)
+            .Persist("ConfirmationResult");
         }
     }
 }

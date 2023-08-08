@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq.Expressions;
 
 namespace Rx.Net.StateMachine.Extensions
@@ -10,7 +11,7 @@ namespace Rx.Net.StateMachine.Extensions
         public ExpressionRebinder(Dictionary<Expression, Expression> rebindMap) => 
             _rebindMap = rebindMap;
 
-        public override Expression Visit(Expression node)
+        public override Expression? Visit(Expression? node)
         {
             if (node == null)
                 return null;

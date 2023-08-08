@@ -6,6 +6,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Rx.Net.StateMachine.EntityFramework.Tests.Tables
 {
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
     [Index(nameof(SessionStateId), nameof(Name), IsUnique = true)]
     public class SessionEventAwaiterTable<TContext, TContextKey>
     {
@@ -20,4 +21,5 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.Tables
         [ForeignKey(nameof(SessionStateId)), DeleteBehavior(DeleteBehavior.NoAction)]
         public SessionStateTable<TContext, TContextKey> SessionState { get; set; }
     }
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
 }

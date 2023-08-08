@@ -6,6 +6,7 @@ using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Storage;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -15,13 +16,13 @@ namespace Rx.Net.StateMachine
 {
     public struct StateMachineScope
     {
-        public string StatePrefix { get; }
+        public string? StatePrefix { get; }
         public StateMachine StateMachine { get; }
         public SessionState SessionState { get; }
         public ISessionStateStorage SessionStateStorage { get; }
         public Guid SessionId => SessionState.SessionStateId.GetValue("SessionStateId");
 
-        public StateMachineScope(StateMachine stateMachine, SessionState sessionState, ISessionStateStorage sessionStateRepository, string prefix = null)
+        public StateMachineScope(StateMachine stateMachine, SessionState sessionState, ISessionStateStorage sessionStateRepository, string? prefix = null)
         {
             StateMachine = stateMachine;
             SessionState = sessionState;
@@ -29,7 +30,7 @@ namespace Rx.Net.StateMachine
             StatePrefix = prefix;
         }
 
-        public bool TryGetStep<TSource>(string stateId, out TSource stepValue) =>
+        public bool TryGetStep<TSource>(string stateId, [MaybeNullWhen(false)]out TSource? stepValue) =>
             SessionState.TryGetStep(AddPrefix(stateId), StateMachine.SerializerOptions, out stepValue);
 
         public StateMachineScope BeginScope(string prefix) =>
@@ -61,8 +62,8 @@ namespace Rx.Net.StateMachine
             return this;
         }
 
-        public IEnumerable<TEvent> GetEvents<TEvent>(Func<TEvent, bool> matches) =>
-            SessionState.GetEvents(matches, StateMachine.SerializerOptions);
+        public IEnumerable<TEvent> GetEvents<TEvent>(Func<TEvent, bool>? matches) =>
+            SessionState.GetEvents(matches);
 
         public Task AddStep<TState>(string stateId, TState stepState)
         {
@@ -92,7 +93,7 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
-        public TItem GetItem<TItem>(string itemId)
+        public TItem? GetItem<TItem>(string itemId)
         {
             return SessionState.GetItem<TItem>(AddPrefix(itemId), StateMachine.SerializerOptions);
         }
@@ -104,10 +105,12 @@ namespace Rx.Net.StateMachine
         {
             var recoursionDepth = GetRecoursionDepth();
             if (recoursionDepth == null)
-                yield return GetItem<TItem>(itemId);
+                yield return GetItem<TItem>(itemId)
+                    ?? throw new InvalidOperationException($"Could not get item {itemId}");
 
             while (recoursionDepth > 0)
-                yield return SessionState.GetItem<TItem>(AddPrefix(StatePrefix, recoursionDepth--, itemId), StateMachine.SerializerOptions);
+                yield return SessionState.GetItem<TItem>(AddPrefix(StatePrefix, recoursionDepth--, itemId), StateMachine.SerializerOptions)
+                    ?? throw new InvalidOperationException($"Could not get items {itemId} for recoursing depth {recoursionDepth + 1}");
         }
 
         public Task DeleteItem(string itemId)
@@ -148,7 +151,7 @@ namespace Rx.Net.StateMachine
 
         public Task RemoveScopeAwaiters()
         {
-            SessionState.RemoveEventAwaiters(StatePrefix);
+            SessionState.RemoveEventAwaiters(StatePrefix ?? throw new InvalidOperationException("StatePrefix is null"));
 
             return SessionStateStorage.PersistEventAwaiter(SessionState);
         }
@@ -171,7 +174,7 @@ namespace Rx.Net.StateMachine
             return zipped;
         }
 
-        private static string GetDepthName(string prefix) => $"{prefix}[depth]";
+        private static string GetDepthName(string? prefix) => $"{prefix}[depth]";
 
         public int? GetRecoursionDepth()
         {
@@ -185,7 +188,7 @@ namespace Rx.Net.StateMachine
         private string AddPrefix(string stateId) =>
             AddPrefix(StatePrefix, GetRecoursionDepth(), stateId);
 
-        private static string AddPrefix(string prefix, int? recoursionDepth, string stateId)
+        private static string AddPrefix(string? prefix, int? recoursionDepth, string stateId)
         {
             if (prefix == null)
                 return stateId;

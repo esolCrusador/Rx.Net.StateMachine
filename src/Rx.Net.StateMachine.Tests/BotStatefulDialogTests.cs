@@ -1,7 +1,7 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Rx.Net.StateMachine.Extensions;
-using Rx.Net.StateMachine.ObservableExtensions;
+using Rx.Net.StateMachine.Flow;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Tests.Awaiters;
 using Rx.Net.StateMachine.Tests.Extensions;
@@ -14,7 +14,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
-using System.Reactive.Threading.Tasks;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -83,9 +82,9 @@ namespace Rx.Net.StateMachine.Tests
             var messages = _ctx.Chat.ReadNewBotMessages(_botId, _chatId);
             var secondMessage = messages.Skip(1).First();
 
-            await _ctx.Chat.ClickButton(secondMessage, secondMessage.Buttons.First().Value);
+            await _ctx.Chat.ClickButton(secondMessage, secondMessage.Buttons!.First().Value);
             var updatedMessage = _ctx.Chat.ReadMessage(_botId, _chatId, secondMessage.MessageId);
-            updatedMessage.Buttons.First().Key.Should().Be("Pause");
+            updatedMessage!.Buttons!.First().Key.Should().Be("Pause");
         }
 
         [Fact]
@@ -95,11 +94,11 @@ namespace Rx.Net.StateMachine.Tests
             var messages = _ctx.Chat.ReadNewBotMessages(_botId, _chatId);
             var secondMessage = messages.Skip(1).First();
 
-            await _ctx.Chat.ClickButton(secondMessage, secondMessage.Buttons.First().Value);
+            await _ctx.Chat.ClickButton(secondMessage, secondMessage.Buttons!.First().Value);
             secondMessage = _ctx.Chat.ReadMessage(_botId, _chatId, secondMessage.MessageId);
-            await _ctx.Chat.ClickButton(secondMessage, secondMessage.Buttons.First().Value);
+            await _ctx.Chat.ClickButton(secondMessage!, secondMessage!.Buttons!.First().Value);
             secondMessage = _ctx.Chat.ReadMessage(_botId, _chatId, secondMessage.MessageId);
-            secondMessage.Buttons.First().Key.Should().Be("Play");
+            secondMessage!.Buttons!.First().Key.Should().Be("Play");
         }
 
         [Fact]
@@ -109,7 +108,7 @@ namespace Rx.Net.StateMachine.Tests
             var messages = _ctx.Chat.ReadNewBotMessages(_botId, _chatId);
             var secondMessage = messages.Skip(1).First();
 
-            await _ctx.Chat.ClickButton(secondMessage, secondMessage.Buttons.Last().Value);
+            await _ctx.Chat.ClickButton(secondMessage, secondMessage.Buttons!.Last().Value);
             secondMessage = _ctx.Chat.ReadMessage(_botId, _chatId, secondMessage.MessageId);
             secondMessage.Should().BeNull();
             _itemsManager.GetItems().Count.Should().Be(2);
@@ -123,10 +122,10 @@ namespace Rx.Net.StateMachine.Tests
             var messages = _ctx.Chat.ReadNewBotMessages(_botId, _chatId);
             var secondMessage = messages.Skip(1).First();
 
-            await _ctx.Chat.ClickButton(secondMessage, secondMessage.Buttons.Skip(1).First().Value);
+            await _ctx.Chat.ClickButton(secondMessage, secondMessage.Buttons!.Skip(1).First().Value);
             var confirmation = _ctx.Chat.ReadNewBotMessages(_botId, _chatId).Single();
 
-            await _ctx.Chat.ClickButton(secondMessage, confirmation.Buttons.First(b => b.Key == "Yes").Value);
+            await _ctx.Chat.ClickButton(secondMessage, confirmation.Buttons!.First(b => b.Key == "Yes").Value);
         }
 
         private async Task ShowItems()
@@ -180,16 +179,16 @@ namespace Rx.Net.StateMachine.Tests
             public const string Id = "task-actions";
             public override string WorkflowId => Id;
 
-            public override IObservable<Unit> Execute(IObservable<ItemWithMessage> input, StateMachineScope scope)
+            public override IFlow<Unit> Execute(IFlow<ItemWithMessage> input)
             {
-                var context = scope.GetContext<UserContext>();
+                var context = input.Scope.GetContext<UserContext>();
 
                 return input
-                    .Persist(scope, "Item")
-                    .Select(itemWithMessage =>
+                    .Persist("Item")
+                    .Select((itemWithMessage, scope) =>
                     {
                         var item = itemWithMessage.Item;
-                        return Observable.FromAsync(() =>
+                        return scope.StartFlow(() =>
                         {
                             var currentState = scope.GetStateString();
 
@@ -198,8 +197,8 @@ namespace Rx.Net.StateMachine.Tests
                                     new KeyValuePair<string, string>("Edit", $"s:{currentState}-e"),
                                     new KeyValuePair<string, string>("Delete", $"s:{currentState}-d")
                                 );
-                        }).PersistBeforePrevious(scope, "InitialDialog")
-                        .StopAndWait().For<BotFrameworkButtonClick>(scope, "InitialButtonClock", messageId => new BotFrameworkButtonClickAwaiter(context, messageId))
+                        }).PersistBeforePrevious("InitialDialog")
+                        .StopAndWait().For<BotFrameworkButtonClick>("InitialButtonClock", messageId => new BotFrameworkButtonClickAwaiter(context, messageId))
                         .SelectAsync(async buttonClick =>
                         {
                             string selectedValue = buttonClick.SelectedValue.Substring(buttonClick.SelectedValue.LastIndexOf('-') + 1);
@@ -230,9 +229,7 @@ namespace Rx.Net.StateMachine.Tests
                                     throw new NotSupportedException(buttonClick.SelectedValue);
                             }
                         });
-                    })
-                    .Concat()
-                    .Select(_ => Unit.Default);
+                    });
             }
 
             private async Task UpdateItemMessage(ItemWithMessage item, UserContext dialogContext)
@@ -255,18 +252,18 @@ namespace Rx.Net.StateMachine.Tests
             public const string Id = "edit-item";
             public override string WorkflowId => Id;
 
-            public override IObservable<Unit> Execute(IObservable<ItemWithMessage> input, StateMachineScope scope)
+            public override IFlow<Unit> Execute(IFlow<ItemWithMessage> input)
             {
-                var context = scope.GetContext<UserContext>();
+                var context = input.Scope.GetContext<UserContext>();
                 
-                return input.Persist(scope, "Item").Select(item =>
+                return input.Persist("Item").Select((item, scope) =>
                 {
-                    return Observable.FromAsync(() => _botFake.SendButtonsBotMessage(context.BotId, context.ChatId, "Do you want to change name?", item.MessageId,
+                    return scope.StartFlow(() => _botFake.SendButtonsBotMessage(context.BotId, context.ChatId, "Do you want to change name?", item.MessageId,
                         new KeyValuePair<string, string>("Yes", "yes"),
                         new KeyValuePair<string, string>("No", "no")
                     ))
-                    .Persist(scope, "ChangeNameConfirmation")
-                    .PersistDisposableItem(scope)
+                    .Persist("ChangeNameConfirmation")
+                    .PersistDisposableItem()
                     .Select(messageId =>
                         scope.StopAndWait<BotFrameworkButtonClick>("ChangeNameConfirmationWait", new BotFrameworkButtonClickAwaiter(context, messageId))
                         .Select(click => click.SelectedValue == "yes")
@@ -275,47 +272,45 @@ namespace Rx.Net.StateMachine.Tests
                             if (isExecuted)
                                 await _botFake.DeleteBotMessage(context.BotId, context.ChatId, messageId);
                         })
-                    ).Concat()
-                    .Select(changeName =>
+                    )
+                    .SelectAsync(async (changeName, scope) =>
                     {
                         if (!changeName)
-                            return StateMachineObservableExtensions.Of(Unit.Default);
+                            return scope.StartFlow();
 
-                        return UpdateItemName(item.Item, scope.BeginRecursiveScope("Name"));
+                        return UpdateItemName(item.Item, await scope.BeginRecursiveScope("Name"));
                     })
-                    .Concat()
-                    .SelectAsync(_ => scope.DeleteDisposableItems());
-                }).Concat();
+                    .SelectAsync(async (_, scope) => await scope.DeleteDisposableItems());
+                });
             }
 
-            private IObservable<Unit> UpdateItemName(Item item, Task<StateMachineScope> scopeTask)
+            private IFlow<Unit> UpdateItemName(Item item, StateMachineScope outerScope)
             {
-                return scopeTask.ToObservable()
-                    .Select(scope =>
+                return outerScope.StartFlow()
+                    .Select((_, scope) =>
                     {
                         var context = scope.GetContext<UserContext>();
 
-                        return Observable.FromAsync(() =>
+                        return scope.StartFlow(() =>
                             _botFake.SendBotMessage(context.BotId, context.ChatId, "Please enter name"))
-                                .PersistDisposableItem(scope)
+                                .PersistDisposableItem()
                                 .Select(messageId =>
                                     scope.StopAndWait<BotFrameworkMessage>("NameInput", new BotFrameworkMessageAwaiter(context))
-                                    .Select(nameInput =>
+                                    .Select((nameInput, scope) =>
                                     {
                                         if (string.IsNullOrEmpty(nameInput.Text))
-                                            return Observable.FromAsync(() => _botFake.SendBotMessage(context.BotId, context.ChatId, "Name is not valid", messageId))
-                                                .PersistDisposableItem(scope)
-                                                .Select(_ =>
-                                                        UpdateItemName(item, scope.IncreaseRecursionDepth())
-                                                ).Concat();
+                                            return scope.StartFlow(() => _botFake.SendBotMessage(context.BotId, context.ChatId, "Name is not valid", messageId))
+                                                .PersistDisposableItem()
+                                                .SelectAsync(async _ =>
+                                                        UpdateItemName(item, await scope.IncreaseRecursionDepth())
+                                                );
 
-                                        return Observable.FromAsync(() => _itemsManager.UpdateItem(item.Id, i => i.Name = nameInput.Text))
+                                        return scope.StartFlow(() => _itemsManager.UpdateItem(item.Id, i => i.Name = nameInput.Text))
                                             .Select(_ => Unit.Default);
                                     })
-                                    .Concat()
-                                    .DeleteMssages(scope, _botFake)
-                                ).Concat();
-                    }).Concat();
+                                    .DeleteMssages(_botFake)
+                                );
+                    });
             }
         }
 
@@ -351,7 +346,7 @@ namespace Rx.Net.StateMachine.Tests
         class Item
         {
             public Guid Id { get; set; }
-            public string Name { get; set; }
+            public string? Name { get; set; }
             public ItemStatus Status { get; set; }
         }
 

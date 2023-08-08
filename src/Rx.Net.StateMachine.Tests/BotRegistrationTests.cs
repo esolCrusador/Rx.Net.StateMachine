@@ -1,6 +1,6 @@
 ﻿using FluentAssertions;
 using Rx.Net.StateMachine.Extensions;
-using Rx.Net.StateMachine.ObservableExtensions;
+using Rx.Net.StateMachine.Flow;
 using Rx.Net.StateMachine.Tests.Awaiters;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Fakes;
@@ -21,8 +21,8 @@ namespace Rx.Net.StateMachine.Tests
     class UserModel
     {
         public Guid Id { get; set; }
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
         public DateTime BirthDate { get; set; }
     }
     public abstract class BotRegistrationTests : IAsyncLifetime
@@ -157,80 +157,74 @@ namespace Rx.Net.StateMachine.Tests
 
             public BotRegistrationWorkflowFactory(ChatFake botFake) => _botFake = botFake;
 
-            public override IObservable<Unit> Execute(StateMachineScope scope)
+            public override IFlow<Unit> Execute(IFlow<Unit> flow)
             {
-                var ctx = scope.GetContext<UserContext>();
-                return Observable.FromAsync(async () =>
+                var ctx = flow.Scope.GetContext<UserContext>();
+                return flow.SelectAsync(async (_, scope) =>
                 {
                     await scope.MakeDefault(true);
                     return await _botFake.SendBotMessage(ctx.BotId, ctx.ChatId, "Hello, please follow steps to pass registration process");
                 })
-                    .PersistDisposableItem(scope)
+                    .PersistDisposableItem()
                     .Select(_ => new UserModel { Id = ctx.UserId })
-                    .Persist(scope, "UserId")
-                    .SelectAsync(async user => GetFirstName(await scope.BeginRecursiveScope("FirstName")).Select(firstName =>
+                    .Persist("UserId")
+                    .SelectAsync(async (user, scope) => GetFirstName(await scope.BeginRecursiveScope("FirstName")).Select(firstName =>
                     {
                         user.FirstName = firstName;
                         return user;
                     }))
-                    .Concat()
-                    .Persist(scope, "FirstName")
-                    .Select(async user => GetLastName(await scope.BeginRecursiveScope("LastName")).Select(lastName =>
+                    .Persist("FirstName")
+                    .SelectAsync(async (user, scope) => GetLastName(await scope.BeginRecursiveScope("LastName")).Select(lastName =>
                     {
                         user.LastName = lastName;
                         return user;
                     }))
-                    .Concat()
-                    .Concat()
-                    .Persist(scope, "LastName")
-                    .Select(async user => GetBirthDate(await scope.BeginRecursiveScope("BirthDate")).Select(birthDate =>
+                    .Persist("LastName")
+                    .SelectAsync(async (user, scope) => GetBirthDate(await scope.BeginRecursiveScope("BirthDate")).Select(birthDate =>
                     {
                         user.BirthDate = birthDate;
                         return user;
                     }))
-                    .Concat()
-                    .Concat()
                     .SelectAsync(async user =>
                     {
                         await _botFake.SendBotMessage(ctx.BotId, ctx.ChatId, $"You was successfuly registered: {JsonSerializer.Serialize(user)}");
 
                         return user;
                     })
-                    .DeleteMssages(scope, _botFake)
+                    .DeleteMssages(_botFake)
                     .FinallyAsync(async (isExecuted, el, ex) =>
                     {
                         if (isExecuted)
-                            await scope.MakeDefault(false);
+                            await flow.Scope.MakeDefault(false);
                     })
                     .MapToVoid();
             }
 
-            private IObservable<string> RequestStringInput(StateMachineScope scope, string displayName, string stateName, Func<string, ValidationResult> validate)
+            private IFlow<string> RequestStringInput(StateMachineScope scope, string displayName, string stateName, Func<string, ValidationResult> validate)
             {
                 var ctx = scope.GetContext<UserContext>();
-                return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.BotId, ctx.ChatId, $"Please enter your {displayName}"))
-                    .PersistDisposableItem(scope)
-                    .Persist(scope, $"Ask{stateName}")
-                    .StopAndWait().For<BotFrameworkMessage>(scope, "MessageReceived", new BotFrameworkMessageAwaiter(ctx))
-                    .PersistDisposableItem(scope, m => m.MessageId)
+                return scope.StartFlow(() => _botFake.SendBotMessage(ctx.BotId, ctx.ChatId, $"Please enter your {displayName}"))
+                    .PersistDisposableItem()
+                    .Persist($"Ask{stateName}")
+                    .StopAndWait().For<BotFrameworkMessage>("MessageReceived", new BotFrameworkMessageAwaiter(ctx))
+                    .PersistDisposableItem(m => m.MessageId)
                     .Select(message =>
                     {
                         string text = message.Text;
                         var validationResult = validate(text);
                         if (validationResult == ValidationResult.Success)
-                            return StateMachineObservableExtensions.Of(message.Text);
+                            return scope.StartFlow(message.Text);
 
-                        return Observable.FromAsync(() => _botFake.SendBotMessage(ctx.BotId, ctx.ChatId, validationResult.ErrorMessage!))
-                                    .PersistDisposableItem(scope)
-                                    .Persist(scope, $"Invalid{stateName}")
-                                    .IncreaseRecoursionDepth(scope)
-                                    .Select(_ => RequestStringInput(scope, displayName, stateName, validate))
-                                    .Concat();
-                    }).Concat()
-                    .DeleteMssages(scope, _botFake);
+                        return scope.StartFlow(() => _botFake.SendBotMessage(ctx.BotId, ctx.ChatId, validationResult.ErrorMessage!))
+                                    .PersistDisposableItem()
+                                    .Persist($"Invalid{stateName}")
+                                    .IncreaseRecoursionDepth()
+                                    .Select(_ => RequestStringInput(scope, displayName, stateName, validate));
+                    })
+                    .DeleteMssages(_botFake);
             }
 
-            private IObservable<string> GetFirstName(StateMachineScope scope)
+            private IFlow<string> GetFirstName(StateMachineScope scope)
             {
                 return RequestStringInput(scope, "first name", "FirstName", s =>
                 {
@@ -241,7 +235,7 @@ namespace Rx.Net.StateMachine.Tests
                 });
             }
 
-            private IObservable<string> GetLastName(StateMachineScope scope)
+            private IFlow<string> GetLastName(StateMachineScope scope)
             {
                 return RequestStringInput(scope, "last name", "LastName", s =>
                 {
@@ -252,7 +246,7 @@ namespace Rx.Net.StateMachine.Tests
                 });
             }
 
-            private IObservable<DateTime> GetBirthDate(StateMachineScope scope)
+            private IFlow<DateTime> GetBirthDate(StateMachineScope scope)
             {
                 return RequestStringInput(scope, "birth date", "BirthDate", s =>
                 {

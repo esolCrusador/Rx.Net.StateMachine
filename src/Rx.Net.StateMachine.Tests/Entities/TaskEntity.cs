@@ -6,6 +6,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Rx.Net.StateMachine.Tests.Entities
 {
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
     public class TaskEntity
     {
         [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)] public int TaskId { get; set; }
@@ -19,4 +20,5 @@ namespace Rx.Net.StateMachine.Tests.Entities
         [ForeignKey(nameof(AssigneeId))] public UserEntity Assignee { get; set; }
         [ForeignKey(nameof(SupervisorId))] public UserEntity? Supervisor { get; set; }
     }
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
 }

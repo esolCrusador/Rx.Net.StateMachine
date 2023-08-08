@@ -36,7 +36,7 @@ namespace Rx.Net.StateMachine.Extensions
 
                     var expressionBody = rebinder.Visit(resultSelector.Body);
                     return Expression.Lambda<Func<TSource, TResult>>(
-                        rebinder.Visit(expressionBody),
+                        rebinder.Visit(expressionBody)!,
                         accumulate.Parameters[0]
                     );
                 }

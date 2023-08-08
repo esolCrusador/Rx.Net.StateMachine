@@ -6,6 +6,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Rx.Net.StateMachine.Tests.Persistence
 {
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
     public class UserContext
     {
         [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)] public int ContextId { get; set; }
@@ -17,4 +18,5 @@ namespace Rx.Net.StateMachine.Tests.Persistence
 
         [ForeignKey(nameof(UserId))] public UserEntity User { get; set; }
     }
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
 }

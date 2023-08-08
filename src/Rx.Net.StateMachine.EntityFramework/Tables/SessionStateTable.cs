@@ -6,6 +6,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Rx.Net.StateMachine.EntityFramework.Tables
 {
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
     public class SessionStateTable<TContext, TContextKey>
     {
         public const int ResultLength = 1024;
@@ -25,4 +26,5 @@ namespace Rx.Net.StateMachine.EntityFramework.Tables
         public DateTimeOffset UpdatedAt { get; set; }
         [Timestamp] public byte[] ConcurrencyToken { get; set; }
     }
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
 }

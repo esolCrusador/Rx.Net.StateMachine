@@ -16,6 +16,7 @@ using System.Threading.Tasks;
 namespace Rx.Net.StateMachine.Persistance
 {
     public class WorkflowManager<TContext>
+        where TContext: class
     {
         private readonly AsyncPolicy _concurrencyRetry;
         private readonly ILogger<WorkflowManager<TContext>> _logger;
@@ -134,6 +135,7 @@ namespace Rx.Net.StateMachine.Persistance
         }
 
         public Task<List<HandlingResult>> HandleEvent<TEvent>(TEvent @event)
+            where TEvent: class
         {
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
@@ -200,6 +202,7 @@ namespace Rx.Net.StateMachine.Persistance
         }
 
         private async Task<HandlingResult> HandleSessionStateEvent<TEvent>(SessionStateEntity sessionStateEntity, TEvent @event, ISessionStateUnitOfWork uof)
+            where TEvent: class
         {
 
             var sessionState = ToSessionState(sessionStateEntity);

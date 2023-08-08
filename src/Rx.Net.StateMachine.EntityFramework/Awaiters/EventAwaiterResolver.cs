@@ -15,8 +15,11 @@ namespace Rx.Net.StateMachine.EntityFramework.Awaiters
         {
             _awaitHandlerResolver = awaitHandlerResolver;
         }
-        public IEnumerable<IEventAwaiter<TEvent>> GetEventAwaiters<TEvent>(TEvent @event) =>
-            GetEventAwaiters(@event, typeof(TEvent)).Cast<IEventAwaiter<TEvent>>();
+        public IEnumerable<IEventAwaiter<TEvent>> GetEventAwaiters<TEvent>(TEvent @event)
+            where TEvent: class
+        {
+            return GetEventAwaiters(@event, typeof(TEvent)).Cast<IEventAwaiter<TEvent>>();
+        }
 
         public IEnumerable<IEventAwaiter> GetEventAwaiters(object @event) =>
             GetEventAwaiters(@event, @event.GetType());

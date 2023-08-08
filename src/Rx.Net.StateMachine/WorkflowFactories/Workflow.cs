@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Rx.Net.StateMachine.Flow;
+using System;
 using System.Reactive;
 using System.Reactive.Linq;
 
@@ -8,14 +9,14 @@ namespace Rx.Net.StateMachine.WorkflowFactories
     {
         public abstract string WorkflowId { get; }
 
-        public abstract IObservable<Unit> Execute(StateMachineScope scope);
+        public abstract IFlow<Unit> Execute(IFlow<Unit> flow);
     }
 
     public abstract class Workflow<TSource> : Workflow, IWorkflow<TSource>
     {
-        public override IObservable<Unit> Execute(StateMachineScope scope) =>
-            Execute(Observable.Empty<TSource>(), scope);
+        public override IFlow<Unit> Execute(IFlow<Unit> flow) =>
+            Execute(new StateMachineFlow<TSource>(flow.Scope, Observable.Empty<TSource>()));
 
-        public abstract IObservable<Unit> Execute(IObservable<TSource> input, StateMachineScope scope);
+        public abstract IFlow<Unit> Execute(IFlow<TSource> flow);
     }
 }

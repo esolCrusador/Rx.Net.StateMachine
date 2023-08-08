@@ -1,12 +1,8 @@
 ﻿using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Tests.Fakes;
-using Rx.Net.StateMachine.Tests.Models;
 using Rx.Net.StateMachine.Tests.Persistence;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reactive.Linq;
-using Rx.Net.StateMachine.ObservableExtensions;
 using Rx.Net.StateMachine.Tests.Extensions;
 using Rx.Net.StateMachine.Tests.Events;
 using Rx.Net.StateMachine.Events;
@@ -14,6 +10,7 @@ using Rx.Net.StateMachine.Tests.DataAccess;
 using System.Reactive;
 using Rx.Net.StateMachine.Tests.Awaiters;
 using Rx.Net.StateMachine.Extensions;
+using Rx.Net.StateMachine.Flow;
 
 namespace Rx.Net.StateMachine.Tests.Controls
 {
@@ -34,25 +31,24 @@ namespace Rx.Net.StateMachine.Tests.Controls
             _showCommentControl = showCommentControl;
         }
 
-        public IObservable<Unit> StartDialog(StateMachineScope scope, TaskMessageContext source, bool mondatory)
+        public IFlow<Unit> StartDialog(StateMachineScope scope, TaskMessageContext source, bool mondatory)
         {
             var userContext = scope.GetContext<UserContext>();
-            
-            return Observable.FromAsync(async () =>
+
+            return scope.StartFlow(async () =>
             {
                 await _workflowManagerAccessor.WorkflowManager.RemoveDefaultSesssions(scope.SessionId, userContext.ContextId.ToString());
                 await scope.MakeDefault(true);
 
                 return await _chat.SendBotMessage(userContext.BotId, userContext.ChatId, "Please send message to this chat");
             })
-            .PersistDisposableItem(scope)
-            .Persist(scope, "CommentRequested")
+            .PersistDisposableItem()
+            .Persist("CommentRequested")
             .WhenAny(
-                scope,
                 "UserMessageOrTimeout",
-                (messageId, innerScope) =>
-                    innerScope.StopAndWait<BotFrameworkMessage>("UserMessage", new BotFrameworkMessageAwaiter(userContext))
-                    .SelectAsync(async message =>
+                inner =>
+                    inner.StopAndWait().For<BotFrameworkMessage>("UserMessage", _ => new BotFrameworkMessageAwaiter(userContext))
+                    .SelectAsync(async (message, innerScope) =>
                     {
                         var comment = await _taskRepository.AddComment(
                             source.TaskId,
@@ -64,11 +60,12 @@ namespace Rx.Net.StateMachine.Tests.Controls
                         await _chat.DeleteUserMessage(userContext.BotId, userContext.ChatId, message.MessageId);
                         await _showCommentControl.ShowComment(userContext, comment, source.MessageId);
                     }),
-                (messageId, innerScope) => {
+                inner =>
+                {
                     if (mondatory)
                         return null;
 
-                    return Observable.FromAsync(async () =>
+                    return inner.SelectAsync(async (_, innerScope) =>
                                         {
                                             var timeout = new TimeoutEvent
                                             {
@@ -78,12 +75,11 @@ namespace Rx.Net.StateMachine.Tests.Controls
                                             await _scheduler.ScheduleEvent(timeout, TimeSpan.FromMinutes(5));
                                             return timeout.EventId;
                                         })
-                                        .Persist(scope, "TimeoutAdded")
-                                        .StopAndWait().For<TimeoutEvent>(innerScope, "Timeout", to => new TimeoutEventAwaiter(to))
+                                        .Persist("TimeoutAdded")
+                                        .StopAndWait().For<TimeoutEvent>("Timeout", to => new TimeoutEventAwaiter(to))
                                         .MapToVoid();
                 },
-                (messageId, innerScope) =>
-                    innerScope.StopAndWait<DefaultSessionRemoved>("DefaultSessionRemoved", DefaultSessionRemovedAwaiter.Default)
+                inner => inner.StopAndWait().For<DefaultSessionRemoved>("DefaultSessionRemoved", DefaultSessionRemovedAwaiter.Default)
                     .MapToVoid()
             )
             .FinallyAsync(async (isExecuted, el, ex) =>
@@ -91,8 +87,7 @@ namespace Rx.Net.StateMachine.Tests.Controls
                 if (isExecuted)
                     await scope.MakeDefault(false);
             })
-            .DeleteMssages(scope, _chat)
-            .Take(1);
+            .DeleteMssages(_chat);
         }
     }
 }

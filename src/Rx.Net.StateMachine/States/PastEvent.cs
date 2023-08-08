@@ -27,7 +27,7 @@ namespace Rx.Net.StateMachine.States
             SequenceNumber = sessionEvent.SequenceNumber;
             var eventType = sessionEvent.Event.GetType();
             Event = sessionEvent.Event;
-            EventType = eventType.AssemblyQualifiedName;
+            EventType = eventType.AssemblyQualifiedName ?? throw new System.TypeAccessException($"Could not get name for {eventType.FullName}");
             Awaiters = sessionEvent.Awaiters.Select(a => $"{a.AwaiterId:N}-{a.Identifier}-{a.SequenceNumber}").ToArray();
             Handled = sessionEvent.Handled;
         }

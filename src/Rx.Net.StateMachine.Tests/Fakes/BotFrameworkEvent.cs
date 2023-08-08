@@ -7,6 +7,6 @@ namespace Rx.Net.StateMachine.Tests.Fakes
         public long ChatId { get; set; }
         public long BotId { get; set; }
         public int MessageId { get; set; }
-        public string SelectedValue { get; set; }
+        public required string SelectedValue { get; set; }
     }
 }
