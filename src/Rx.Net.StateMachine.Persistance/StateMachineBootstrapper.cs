@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Rx.Net.StateMachine.Persistance.Attributes;
 using Rx.Net.StateMachine.WorkflowFactories;
+using System.Reflection;
 using System.Text.Json;
 
 namespace Rx.Net.StateMachine.Persistance
@@ -7,7 +9,7 @@ namespace Rx.Net.StateMachine.Persistance
     public static class StateMachineBootstrapper
     {
         public static IServiceCollection AddStateMachine<TContext>(this IServiceCollection services, JsonSerializerOptions? jsonSerializerOptions = null)
-            where TContext: class
+            where TContext : class
         {
             if (jsonSerializerOptions != null)
                 services.AddSingleton(jsonSerializerOptions);
@@ -24,6 +26,17 @@ namespace Rx.Net.StateMachine.Persistance
         {
             services.AddSingleton<TWorkflow>();
             services.AddSingleton<IWorkflow>(sp => sp.GetRequiredService<TWorkflow>());
+
+            var oldVersionsAttribute = typeof(TWorkflow).GetCustomAttribute<OldWorkflowVersionsAttribute>();
+            if (oldVersionsAttribute != null)
+            {
+                foreach(var oldWorkflow in oldVersionsAttribute.OldWorkflowVersions)
+                {
+                    services.AddSingleton(oldWorkflow);
+                    services.AddSingleton(typeof(IWorkflow), sp => sp.GetRequiredService(oldWorkflow));
+                }
+            }
+
             return services;
         }
     }

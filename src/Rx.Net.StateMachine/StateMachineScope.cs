@@ -36,6 +36,9 @@ namespace Rx.Net.StateMachine
         public StateMachineScope BeginScope(string prefix) =>
             new StateMachineScope(StateMachine, SessionState, SessionStateStorage, AddPrefix(prefix));
 
+        public StateMachineScope EndScope(string prefix) =>
+            new StateMachineScope(StateMachine, SessionState, SessionStateStorage, RemovePrefix(prefix));
+
         public async Task<StateMachineScope> BeginRecursiveScope(string prefix)
         {
             string depthName = GetDepthName(AddPrefix(prefix));
@@ -187,6 +190,17 @@ namespace Rx.Net.StateMachine
 
         private string AddPrefix(string stateId) =>
             AddPrefix(StatePrefix, GetRecoursionDepth(), stateId);
+
+        private string? RemovePrefix(string stateId)
+        {
+            if (StatePrefix == stateId)
+                return null;
+
+            if (StatePrefix == null || !StatePrefix.EndsWith(stateId))
+                throw new InvalidOperationException($"Can't remove prefix \"{stateId}\" from \"{StatePrefix}\"");
+
+            return StatePrefix.Substring(0, StatePrefix.Length - stateId.Length - 1);
+        }
 
         private static string AddPrefix(string? prefix, int? recoursionDepth, string stateId)
         {

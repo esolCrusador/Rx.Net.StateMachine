@@ -7,7 +7,7 @@ namespace Rx.Net.StateMachine.Extensions
 {
     public static class SerializationExtensions
     {
-        public static TValue? GetValue<TValue>(this object? value, JsonSerializerOptions options)
+        public static TValue? DeserializeValue<TValue>(this object? value, JsonSerializerOptions options)
         {
             if (value == default)
                 return default;

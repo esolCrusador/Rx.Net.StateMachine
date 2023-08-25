@@ -98,6 +98,11 @@ namespace Rx.Net.StateMachine.Flow
             return new StateMachineFlow<TSource>(source.Scope.BeginScope(prefix), source.Observable);
         }
 
+        public static IFlow<TSource> EndScope<TSource>(this IFlow<TSource> source, string prefix)
+        {
+            return new StateMachineFlow<TSource>(source.Scope.EndScope(prefix), source.Observable);
+        }
+
         private static IFlow<TEvent> WaitOrHandle<TEvent>(StateMachineScope scope, string stateId, IEventAwaiter<TEvent> eventAwaiter, Func<TEvent, bool>? matches)
             where TEvent : class
         {

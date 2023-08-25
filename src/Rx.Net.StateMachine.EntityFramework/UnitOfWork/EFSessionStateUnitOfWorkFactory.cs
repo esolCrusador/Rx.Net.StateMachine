@@ -3,6 +3,7 @@ using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork;
 using Rx.Net.StateMachine.EntityFramework.UnitOfWork;
 using Rx.Net.StateMachine.Persistance;
+using System.Text.Json;
 
 public class EFSessionStateUnitOfWorkFactory<TContext, TContextKey, TUnitOfWork> : ISessionStateUnitOfWorkFactory
     where TContext: class
@@ -11,12 +12,14 @@ public class EFSessionStateUnitOfWorkFactory<TContext, TContextKey, TUnitOfWork>
     private readonly SessionStateDbContextFactory _contextFactory;
     private readonly ContextKeySelector<TContext, TContextKey> _contextKeySelector;
     private readonly AwaitHandlerResolver<TContext, TContextKey> _awaitHandlerResolver;
+    private readonly JsonSerializerOptions _jsonSerializerOptions;
 
-    public EFSessionStateUnitOfWorkFactory(SessionStateDbContextFactory contextFactory, ContextKeySelector<TContext, TContextKey> contextKeySelector, AwaitHandlerResolver<TContext, TContextKey> awaitHandlerResolver)
+    public EFSessionStateUnitOfWorkFactory(SessionStateDbContextFactory contextFactory, ContextKeySelector<TContext, TContextKey> contextKeySelector, AwaitHandlerResolver<TContext, TContextKey> awaitHandlerResolver, JsonSerializerOptions jsonSerializerOptions)
     {
         _contextFactory = contextFactory;
         _contextKeySelector = contextKeySelector;
         _awaitHandlerResolver = awaitHandlerResolver;
+        _jsonSerializerOptions = jsonSerializerOptions;
     }
     public ISessionStateUnitOfWork Create()
     {
@@ -24,7 +27,8 @@ public class EFSessionStateUnitOfWorkFactory<TContext, TContextKey, TUnitOfWork>
         {
             SessionStateDbContext = _contextFactory.CreateBase(),
             ContextKeySelector = _contextKeySelector,
-            EventAwaiterResolver = _awaitHandlerResolver
+            EventAwaiterResolver = _awaitHandlerResolver,
+            JsonSerializerOptions = _jsonSerializerOptions
         };
 
         return uof;

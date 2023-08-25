@@ -61,7 +61,7 @@ namespace Rx.Net.StateMachine.States
             if (!_steps.TryGetValue(stateId, out var step))
                 return false;
 
-            source = step.State.GetValue<TSource>(options);
+            source = step.State.DeserializeValue<TSource>(options);
             return true;
         }
 
@@ -90,7 +90,7 @@ namespace Rx.Net.StateMachine.States
             if (!_items.TryGetValue(itemId, out var itemValue))
                 return false;
 
-            var value = itemValue.GetValue<TItem>(options)
+            var value = itemValue.DeserializeValue<TItem>(options)
                 ?? throw new InvalidOperationException($"Item {itemId} is null");
             value = updateAction(value);
 
@@ -124,7 +124,7 @@ namespace Rx.Net.StateMachine.States
                 return false;
             }
 
-            item = itemValue.GetValue<TItem>(options);
+            item = itemValue.DeserializeValue<TItem>(options);
             return true;
         }
 

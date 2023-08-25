@@ -39,6 +39,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         private DbContext? _sessionStateContext;
         private ContextKeySelector<TContext, TContextKey>? _contextKeySelector;
         private AwaitHandlerResolver<TContext, TContextKey>? _eventAwaiterResolver;
+        private JsonSerializerOptions? _jsonSerializerOptions;
 
         protected internal DbContext SessionStateDbContext
         {
@@ -50,11 +51,15 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             get => _contextKeySelector ?? throw new ArgumentException($"{nameof(ContextKeySelector)} is not initialized");
             set => _contextKeySelector = value;
         }
-
         protected internal AwaitHandlerResolver<TContext, TContextKey> EventAwaiterResolver
         {
             get => _eventAwaiterResolver ?? throw new ArgumentException($"{nameof(EventAwaiterResolver)} is not initialized");
             set => _eventAwaiterResolver = value;
+        }
+        protected internal JsonSerializerOptions JsonSerializerOptions
+        {
+            get => _jsonSerializerOptions ?? throw new ArgumentException($"{nameof(JsonSerializerOptions)} is not initialized");
+            set => _jsonSerializerOptions = value;
         }
 
         public EFSessionStateUnitOfWork()
@@ -169,11 +174,11 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             dest.WorkflowId = source.WorkflowId;
             dest.Counter = source.Counter;
             dest.IsDefault = source.IsDefault;
-            dest.Steps = JsonSerializer.Deserialize<List<SessionStepEntity>>(source.Steps)
+            dest.Steps = JsonSerializer.Deserialize<List<SessionStepEntity>>(source.Steps, JsonSerializerOptions)
                 ?? throw new ArgumentException("Steps must be not null");
-            dest.Items = JsonSerializer.Deserialize<List<SessionItemEntity>>(source.Items)
+            dest.Items = JsonSerializer.Deserialize<List<SessionItemEntity>>(source.Items, JsonSerializerOptions)
                 ?? throw new ArgumentException("Items must be not null");
-            dest.PastEvents = JsonSerializer.Deserialize<List<SessionEventEntity>>(source.PastEvents)
+            dest.PastEvents = JsonSerializer.Deserialize<List<SessionEventEntity>>(source.PastEvents, JsonSerializerOptions)
                 ?? throw new ArgumentException("PastEvents must be not null");
             dest.Awaiters = source.Awaiters.Select(aw => new SessionEventAwaiterEntity
             {
@@ -193,9 +198,9 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             dest.WorkflowId = source.WorkflowId;
             dest.Counter = source.Counter;
             dest.IsDefault = source.IsDefault;
-            dest.Steps = JsonSerializer.Serialize(source.Steps);
-            dest.Items = JsonSerializer.Serialize(source.Items);
-            dest.PastEvents = JsonSerializer.Serialize(source.PastEvents);
+            dest.Steps = JsonSerializer.Serialize(source.Steps, JsonSerializerOptions);
+            dest.Items = JsonSerializer.Serialize(source.Items, JsonSerializerOptions);
+            dest.PastEvents = JsonSerializer.Serialize(source.PastEvents, JsonSerializerOptions);
             dest.Awaiters.ToList().JoinTo(source.Awaiters)
                 .LeftKey(db => db.AwaiterId)
                 .RightKey(e => e.AwaiterId)
