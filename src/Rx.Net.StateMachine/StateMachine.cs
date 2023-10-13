@@ -143,7 +143,8 @@ namespace Rx.Net.StateMachine
             return new HandlingResult(
                 sessionState.SessionStateId,
                 status,
-                sessionState.Counter - initialStepsCount
+                sessionState.Counter - initialStepsCount,
+                sessionState.Context
             );
         }
     }
