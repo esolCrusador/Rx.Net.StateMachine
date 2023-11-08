@@ -13,7 +13,7 @@ using Rx.Net.StateMachine.Tests.Persistence;
 using Rx.Net.StateMachine.WorkflowFactories;
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.Tests.Testing
@@ -74,6 +74,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
             services.AddSingleton<GlobalContextState>();
             services.AddLogging();
             services.AddControls();
+            services.AddSingleton(new JsonSerializerOptions());
 
             services.AddEFStateMachine()
                 .WithContext<UserContext>()
