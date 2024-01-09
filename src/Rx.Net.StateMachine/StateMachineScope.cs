@@ -65,8 +65,8 @@ namespace Rx.Net.StateMachine
             return this;
         }
 
-        public IEnumerable<TEvent> GetEvents<TEvent>(Func<TEvent, bool>? matches) =>
-            SessionState.GetEvents(matches);
+        public IEnumerable<TEvent> GetEvents<TEvent>(IEventAwaiter<TEvent> eventAwaiter, Func<TEvent, bool>? matches) =>
+            SessionState.GetEvents(eventAwaiter, matches);
 
         public Task AddStep<TState>(string stateId, TState stepState)
         {

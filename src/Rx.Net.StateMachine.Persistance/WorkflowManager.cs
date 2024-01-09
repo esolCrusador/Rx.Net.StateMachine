@@ -16,7 +16,7 @@ using System.Threading.Tasks;
 namespace Rx.Net.StateMachine.Persistance
 {
     public class WorkflowManager<TContext>
-        where TContext: class
+        where TContext : class
     {
         private readonly AsyncPolicy _concurrencyRetry;
         private readonly ILogger<WorkflowManager<TContext>> _logger;
@@ -114,6 +114,8 @@ namespace Rx.Net.StateMachine.Persistance
 
         public async Task CancelSession(Guid sessionId, CancellationReason reason)
         {
+            await HandleEvent(new BeforeSessionCancelled(sessionId, reason));
+
             var result = await HandleEvent(new SessionCancelled(sessionId, reason));
             if (result.Count > 1)
                 throw new InvalidOperationException($"Invalid session {sessionId} handled {result.Count} times");
@@ -135,7 +137,7 @@ namespace Rx.Net.StateMachine.Persistance
         }
 
         public Task<List<HandlingResult>> HandleEvent<TEvent>(TEvent @event)
-            where TEvent: class
+            where TEvent : class
         {
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
@@ -167,17 +169,17 @@ namespace Rx.Net.StateMachine.Persistance
             {
                 await using var uof = _uofFactory.Create();
 
-                var sessionStates = await uof.GetSessionStates(events);
-                _logger.LogInformation("Found {0} for events {EventTypes}\r\n{Events}", sessionStates.Select(s => s.SessionStateId), events, events.Select(ev => JsonSerializer.Serialize(ev)));
+                    var sessionStates = await uof.GetSessionStates(events);
+                    _logger.LogInformation("Found {0} for events {EventTypes}\r\n{Events}", sessionStates.Select(s => s.SessionStateId), events, events.Select(ev => JsonSerializer.Serialize(ev)));
 
-                if (sessionStates.Count == 0)
-                    return new List<HandlingResult>();
+                    if (sessionStates.Count == 0)
+                        return new List<HandlingResult>();
 
-                List<HandlingResult> results = new List<HandlingResult>(sessionStates.Count);
-                foreach (var ss in sessionStates)
-                    results.Add(await HandleSessionStateEvents(ss, events, uof));
+                    List<HandlingResult> results = new List<HandlingResult>(sessionStates.Count);
+                    foreach (var ss in sessionStates)
+                        results.Add(await HandleSessionStateEvents(ss, events, uof));
 
-                return results;
+                    return results;
             });
         }
 
@@ -202,7 +204,7 @@ namespace Rx.Net.StateMachine.Persistance
         }
 
         private async Task<HandlingResult> HandleSessionStateEvent<TEvent>(SessionStateEntity sessionStateEntity, TEvent @event, ISessionStateUnitOfWork uof)
-            where TEvent: class
+            where TEvent : class
         {
 
             var sessionState = ToSessionState(sessionStateEntity);

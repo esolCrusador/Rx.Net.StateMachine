@@ -1,7 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Rx.Net.StateMachine.EntityFramework.Awaiters;
-using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.EntityFramework.Extensions;
 using Rx.Net.StateMachine.EntityFramework.Tables;
 using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
@@ -16,7 +14,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork

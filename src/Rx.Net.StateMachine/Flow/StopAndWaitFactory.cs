@@ -33,6 +33,15 @@ namespace Rx.Net.StateMachine.Flow
         /// <summary>
         /// Waits for event and than persists it
         /// </summary>
+        public IFlow<TEvent> For<TEvent>(string eventStateId, Func<TSource, StateMachineScope, IEventAwaiter<TEvent>> getAwaiterId)
+            where TEvent : class
+        {
+            return _source.Select((source, scope) => scope.StopAndWait(eventStateId, getAwaiterId(source, scope), null));
+        }
+
+        /// <summary>
+        /// Waits for event and than persists it
+        /// </summary>
         public IFlow<TEvent> For<TEvent>(string eventStateId, Func<TSource, IEventAwaiter<TEvent>> getAwaiterId, Func<TEvent, bool>? filter = null)
             where TEvent : class
         {

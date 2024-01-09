@@ -4,10 +4,10 @@
     {
         public int SequenceNumber { get; }
         public object Event { get; }
-        public SessionEventAwaiter[] Awaiters { get; }
+        public SessionEventAwaiter[]? Awaiters { get; }
         public bool Handled { get; set; }
 
-        public SessionEvent(object eventModel, int sequenceNumber, SessionEventAwaiter[] awaiters)
+        public SessionEvent(object eventModel, int sequenceNumber, SessionEventAwaiter[]? awaiters)
         {
             Event = eventModel;
             SequenceNumber = sequenceNumber;

@@ -17,6 +17,7 @@ namespace Rx.Net.StateMachine.Events
     public enum CancellationReason
     {
         Expired,
-        SingleAllowed
+        SingleAllowed,
+        ParentFinished,
     }
 }

@@ -76,10 +76,18 @@ namespace Rx.Net.StateMachine.Flow
             );
         }
 
-        public static IFlow<IList<TResult>> WhenAll<TSource, TResult>(this IFlow<TSource> source, params Func<IFlow<TSource>, IFlow<TResult>>[] observables)
+        public static IFlow<IList<TResult>> WhenAll<TSource, TResult>(this IFlow<TSource> source, params Func<IFlow<TSource>, IFlow<TResult>>[] flowFactories)
         {
             return new StateMachineFlow<IList<TResult>>(source.Scope,
-                source.Observable.Select(element => Observable.CombineLatest(observables.Select(obsFactory => obsFactory(source.Scope.StartFlow(element)).Observable.Take(1))))
+                source.Observable.Select(element => Observable.CombineLatest(flowFactories.Select(obsFactory => obsFactory(source.Scope.StartFlow(element)).Observable.Take(1))))
+                .Concat()
+            );
+        }
+
+        public static IFlow<IList<TResult>> WhenAll<TSource, TResult>(this IFlow<TSource> source, IEnumerable<IFlow<TResult>> flows)
+        {
+            return new StateMachineFlow<IList<TResult>>(source.Scope,
+                source.Observable.Select(element => Observable.CombineLatest(flows.Select(flow => flow.Observable.Take(1))))
                 .Concat()
             );
         }
@@ -106,7 +114,7 @@ namespace Rx.Net.StateMachine.Flow
         private static IFlow<TEvent> WaitOrHandle<TEvent>(StateMachineScope scope, string stateId, IEventAwaiter<TEvent> eventAwaiter, Func<TEvent, bool>? matches)
             where TEvent : class
         {
-            var notHandledEvents = scope.GetEvents(matches).ToList();
+            var notHandledEvents = scope.GetEvents(eventAwaiter, matches).ToList();
 
             if (notHandledEvents.Count != 0)
             {

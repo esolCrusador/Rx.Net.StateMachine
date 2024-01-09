@@ -1,4 +1,5 @@
-﻿using Rx.Net.StateMachine.Events;
+﻿using Microsoft.Extensions.Logging;
+using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Exceptions;
 using Rx.Net.StateMachine.Extensions;
 using System;
@@ -55,7 +56,7 @@ namespace Rx.Net.StateMachine.States
             Status = SessionStateStatus.InProgress;
         }
 
-        internal bool TryGetStep<TSource>(string stateId, JsonSerializerOptions options, [MaybeNullWhen(false)]out TSource? source)
+        internal bool TryGetStep<TSource>(string stateId, JsonSerializerOptions options, [MaybeNullWhen(false)] out TSource? source)
         {
             source = default;
             if (!_steps.TryGetValue(stateId, out var step))
@@ -116,7 +117,7 @@ namespace Rx.Net.StateMachine.States
                 AddItem(itemId, createAction(), options);
         }
 
-        internal bool TryGetItem<TItem>(string itemId, JsonSerializerOptions options, [MaybeNullWhen(false)]out TItem? item)
+        internal bool TryGetItem<TItem>(string itemId, JsonSerializerOptions options, [MaybeNullWhen(false)] out TItem? item)
         {
             if (!_items.TryGetValue(itemId, out object? itemValue))
             {
@@ -144,7 +145,7 @@ namespace Rx.Net.StateMachine.States
 
         internal void ForceAddEvent(object @event)
         {
-            var se = new SessionEvent(@event, GetSequenceNumber(), new SessionEventAwaiter[0]);
+            var se = new SessionEvent(@event, GetSequenceNumber(), null);
 
             _events.Add(se);
         }
@@ -162,9 +163,10 @@ namespace Rx.Net.StateMachine.States
             return true;
         }
 
-        internal IEnumerable<TEvent> GetEvents<TEvent>(Func<TEvent, bool>? filter)
+        internal IEnumerable<TEvent> GetEvents<TEvent>(IEventAwaiter<TEvent> eventAwaiter, Func<TEvent, bool>? filter)
         {
-            var result = _events.Select(es => es.Event).OfType<TEvent>();
+            var result = _events.Where(es => es.Event is TEvent && es.Awaiters?.Any(aw => aw.Identifier == eventAwaiter.AwaiterId) != false)
+                .Select(es => (TEvent)es.Event);
 
             if (filter != null)
                 result = result.Where(filter);
@@ -190,7 +192,7 @@ namespace Rx.Net.StateMachine.States
         }
 
         internal void MarkEventAsHandled<TEvent>(TEvent @event, JsonSerializerOptions options)
-            where TEvent: class
+            where TEvent : class
         {
             var eventObject = (object)@event;
             var eventState = _events.FirstOrDefault(se => se.Event == eventObject);
@@ -200,8 +202,9 @@ namespace Rx.Net.StateMachine.States
             eventState.Handled = true;
             _pastEvents.Add(new PastSessionEvent(eventState, options));
 
-            foreach (var awaiter in eventState.Awaiters)
-                _sessionEventAwaiter.Remove(awaiter.Name, out var _);
+            if (eventState.Awaiters != null)
+                foreach (var awaiter in eventState.Awaiters)
+                    _sessionEventAwaiter.Remove(awaiter.Name, out var _);
             _events.Remove(eventState);
         }
 
