@@ -76,6 +76,18 @@ namespace Rx.Net.StateMachine.Flow
             );
         }
 
+        public static IFlow<IList<TResult>> WhenAll<TResult>(this StateMachineScope scope, IEnumerable<IFlow<TResult>> flows)
+        {
+            return new StateMachineFlow<IList<TResult>>(scope,
+                Observable.CombineLatest(flows.Select(fl => fl.Observable.Take(1)))
+            );
+        }
+
+        public static IFlow<IList<TResult>> WhenAll<TResult>(this StateMachineScope scope, params IFlow<TResult>[] flows)
+        {
+            return WhenAll(scope, (IEnumerable<IFlow<TResult>>)flows);
+        }
+
         public static IFlow<IList<TResult>> WhenAll<TSource, TResult>(this IFlow<TSource> source, params Func<IFlow<TSource>, IFlow<TResult>>[] flowFactories)
         {
             return new StateMachineFlow<IList<TResult>>(source.Scope,
