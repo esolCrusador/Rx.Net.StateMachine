@@ -22,6 +22,7 @@ namespace Rx.Net.StateMachine.States
         public Guid? SessionStateId { get; }
         public string WorkflowId { get; private set; }
         public int Counter { get; private set; }
+        public int Version { get; }
         public bool IsDefault { get; private set; }
         public object Context { get; private set; }
         public IReadOnlyDictionary<string, SessionStateStep> Steps => _steps;
@@ -42,6 +43,7 @@ namespace Rx.Net.StateMachine.States
             Context = context;
             IsDefault = isDefault;
             Counter = counter;
+            Version = counter;
             _steps = steps;
             _items = items;
             _pastEvents = pastEvents;

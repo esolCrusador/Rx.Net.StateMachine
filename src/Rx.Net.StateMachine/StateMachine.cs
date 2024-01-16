@@ -5,7 +5,6 @@ using Rx.Net.StateMachine.Helpers;
 using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Storage;
 using Rx.Net.StateMachine.WorkflowFactories;
-using System;
 using System.Collections.Generic;
 using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
@@ -16,22 +15,19 @@ namespace Rx.Net.StateMachine
 {
     public class StateMachine
     {
-        private readonly ILogger<StateMachine> _logger;
-
         public JsonSerializerOptions SerializerOptions { get; }
 
-        public StateMachine(ILogger<StateMachine> logger) : this(logger, new JsonSerializerOptions())
+        public StateMachine() : this(new JsonSerializerOptions())
         {
         }
 
-        public StateMachine(ILogger<StateMachine> logger, JsonSerializerOptions serializerOptions)
+        public StateMachine(JsonSerializerOptions serializerOptions)
         {
-            _logger = logger;
             SerializerOptions = serializerOptions;
         }
 
         public bool AddEvent<TEvent>(SessionState sessionState, TEvent @event, IEnumerable<IEventAwaiter<TEvent>> eventAwaiters)
-            where TEvent: class
+            where TEvent : class
         {
             return sessionState.AddEvent(@event, eventAwaiters);
         }
@@ -42,7 +38,7 @@ namespace Rx.Net.StateMachine
         }
 
         public void ForceAddEvent<TEvent>(SessionState sessionState, TEvent @event)
-            where TEvent: class
+            where TEvent : class
         {
             sessionState.ForceAddEvent(@event);
         }
@@ -109,25 +105,16 @@ namespace Rx.Net.StateMachine
             bool isFinished = default;
             int initialStepsCount = sessionState.Counter;
 
-            try
-            {
-                isFinished = await workflow.Observable.Select(result => true)
-                    .DefaultIfEmpty(false)
-                    .ToTask();
+            isFinished = await workflow.Observable.Select(result => true)
+                .DefaultIfEmpty(false)
+                .ToTask();
 
-                if (isFinished == false)
-                    sessionState.Status = SessionStateStatus.InProgress;
-                else
-                {
-                    sessionState.Status = SessionStateStatus.Completed;
-                    sessionState.Result = "Finished";
-                }
-            }
-            catch (Exception ex)
+            if (isFinished == false)
+                sessionState.Status = SessionStateStatus.InProgress;
+            else
             {
-                sessionState.Status = SessionStateStatus.Failed;
-                sessionState.Result = ex.ToString();
-                _logger.LogError(ex, "Session {SessionId} {WorkflowId} failed", sessionState.SessionStateId, sessionState.WorkflowId);
+                sessionState.Status = SessionStateStatus.Completed;
+                sessionState.Result = "Finished";
             }
 
             sessionState.RemoveNotHandledEvents(SerializerOptions);

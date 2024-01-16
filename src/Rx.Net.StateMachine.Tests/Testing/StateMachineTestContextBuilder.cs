@@ -15,15 +15,20 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
+using static Rx.Net.StateMachine.EntityFramework.EFStateMachineBootstrapper;
 
 namespace Rx.Net.StateMachine.Tests.Testing
 {
     public class StateMachineTestContextBuilder
     {
         private IServiceCollection _services;
+        private readonly DbContextBuilder<UserContext, int> _dbContextBuilder;
 
-        public StateMachineTestContextBuilder(IServiceCollection services) =>
+        public StateMachineTestContextBuilder(IServiceCollection services, DbContextBuilder<UserContext, int> dbContextBuilder)
+        {
             _services = services;
+            _dbContextBuilder = dbContextBuilder;
+        }
 
         public StateMachineTestContextBuilder Configure(Action<IServiceCollection> configure)
         {
@@ -60,10 +65,15 @@ namespace Rx.Net.StateMachine.Tests.Testing
             return this;
         }
 
+        public DbContextBuilder<UserContext, int> ForContextBuilder()
+        {
+            return _dbContextBuilder;
+        }
+
         public StateMachineTestContext Build() =>
             new StateMachineTestContext(_services.BuildServiceProvider());
 
-        public static IServiceCollection RegisterDefaultServices(Func<GlobalContextState, TestSessionStateDbContext> createContext)
+        public static (IServiceCollection Services, DbContextBuilder<UserContext, int> DbContextBuilder) RegisterDefaultServices(Func<GlobalContextState, TestSessionStateDbContext> createContext)
         {
             var services = new ServiceCollection();
             services.AddSingleton(createContext);
@@ -76,7 +86,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
             services.AddControls();
             services.AddSingleton(new JsonSerializerOptions());
 
-            services.AddEFStateMachine()
+            var dbContextBuilder = services.AddEFStateMachine()
                 .WithContext<UserContext>()
                 .WithKey(uc => uc.ContextId)
                 .AddAwaiterHandler<BotFrameworkMessage>(c => c.WithAwaiter<BotFrameworkMessageAwaiter>())
@@ -98,37 +108,39 @@ namespace Rx.Net.StateMachine.Tests.Testing
                 {
                     var contextId = int.Parse(ev.UserContextId);
                     return ss => ss.IsDefault && ss.ContextId == contextId && ss.SessionStateId != ev.SessionId;
-                }).WithAwaiter<DefaultSessionRemovedAwaiter>())
-                .WithDbContext(sp => createContext(sp.GetRequiredService<GlobalContextState>()))
+                }).WithAwaiter<DefaultSessionRemovedAwaiter>());
+
+
+            dbContextBuilder.WithDbContext(sp => createContext(sp.GetRequiredService<GlobalContextState>()))
                 .WithUnitOfWork<TestEFSessionStateUnitOfWork>();
             services.AddSingleton<UserContextRepository>();
 
-            return services;
+            return (services, dbContextBuilder);
         }
         public static StateMachineTestContextBuilder Fast()
         {
             var databaseName = $"TestDatabase-{Guid.NewGuid()}";
 
-            var services = RegisterDefaultServices(gs => new TestSessionStateDbContext(gs, new DbContextOptionsBuilder()
+            var (services, contextBuilder) = RegisterDefaultServices(gs => new TestSessionStateDbContext(gs, new DbContextOptionsBuilder()
                 .EnableSensitiveDataLogging()
                 .UseInMemoryDatabase(databaseName).Options)
             );
             services.AddSingleton(sp => new AsyncWait(TimeSpan.FromMilliseconds(100)));
 
-            return new StateMachineTestContextBuilder(services);
+            return new StateMachineTestContextBuilder(services, contextBuilder);
         }
 
         public static StateMachineTestContextBuilder Slow()
         {
             var databaseName = $"TestDatabase-{Guid.NewGuid()}";
 
-            var services = RegisterDefaultServices(gs => new TestSessionStateDbContext(gs, new DbContextOptionsBuilder()
+            var (services, contextBuilder) = RegisterDefaultServices(gs => new TestSessionStateDbContext(gs, new DbContextOptionsBuilder()
                     .EnableSensitiveDataLogging()
                     .UseSqlServer("Data Source =.; Integrated Security = True; TrustServerCertificate=True; Initial Catalog=TestDatabase;".Replace("TestDatabase", databaseName))
                     .Options));
             services.AddSingleton(sp => new AsyncWait(TimeSpan.FromSeconds(20)));
 
-            return new StateMachineTestContextBuilder(services);
+            return new StateMachineTestContextBuilder(services, contextBuilder);
         }
     }
 }

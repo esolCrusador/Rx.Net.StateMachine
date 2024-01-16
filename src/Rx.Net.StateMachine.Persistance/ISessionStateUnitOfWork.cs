@@ -7,10 +7,9 @@ namespace Rx.Net.StateMachine.Persistance
 {
     public interface ISessionStateUnitOfWork : IDisposable, IAsyncDisposable
     {
-        Task<IReadOnlyCollection<SessionStateEntity>> GetSessionStates(object @event);
-        Task<IReadOnlyCollection<SessionStateEntity>> GetSessionStates(IEnumerable<object> events);
-        Task<SessionStateEntity?> GetSessionState(Guid sessionStateId);
-        Task Add(SessionStateEntity sessionState);
-        Task Save();
+        Task<IReadOnlyCollection<ISessionStateMemento>> GetSessionStates(object @event);
+        Task<IReadOnlyCollection<ISessionStateMemento>> GetSessionStates(IEnumerable<object> events);
+        Task<ISessionStateMemento?> GetSessionState(Guid sessionStateId);
+        Task<ISessionStateMemento> Add(SessionStateEntity sessionState);
     }
 }
