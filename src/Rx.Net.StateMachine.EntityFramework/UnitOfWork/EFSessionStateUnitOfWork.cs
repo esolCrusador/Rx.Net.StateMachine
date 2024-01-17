@@ -129,16 +129,10 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         private IEnumerable<ISessionStateMemento> GetMemenots(IReadOnlyList<SessionStateTable<TContext, TContextKey>> rows)
         {
             for (int i = 0; i < rows.Count; i++)
-            {
-                var entity = new SessionStateEntity();
-                var row = rows[i];
-                Map(row, entity);
-
                 if (i == 0)
-                    yield return CreateMemento(row);
+                    yield return CreateMemento(rows[i]);
                 else
-                    yield return CreateMemento(row, _contextFactory);
-            }
+                    yield return CreateMemento(rows[i], _contextFactory);
         }
 
         public async Task<ISessionStateMemento?> GetSessionState(Guid sessionStateId)
