@@ -20,7 +20,8 @@ namespace Rx.Net.StateMachine
         public StateMachine StateMachine { get; }
         public SessionState SessionState { get; }
         public ISessionStateStorage SessionStateStorage { get; }
-        public Guid SessionId => SessionState.SessionStateId.GetValue("SessionStateId");
+        public readonly Guid SessionId => SessionState.SessionStateId.GetValue("SessionStateId");
+        public readonly int Version => SessionState.Version;
 
         public StateMachineScope(StateMachine stateMachine, SessionState sessionState, ISessionStateStorage sessionStateRepository, string? prefix = null)
         {

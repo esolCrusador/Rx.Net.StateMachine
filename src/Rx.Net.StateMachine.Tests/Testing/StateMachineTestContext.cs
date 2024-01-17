@@ -25,6 +25,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
         public IWorkflowResolver WorkflowResolver => _services.GetRequiredService<IWorkflowResolver>();
         public FakeScheduler Scheduler => _services.GetRequiredService<FakeScheduler>();
         public AsyncWait AsyncWait => _services.GetRequiredService<AsyncWait>();
+        public MessageQueue MessageQueue => _services.GetRequiredService<MessageQueue>();
 
         public StateMachineTestContext(ServiceProvider serviceProvider) =>
             _services = serviceProvider;
@@ -47,7 +48,7 @@ namespace Rx.Net.StateMachine.Tests.Testing
             await _services.DisposeAsync();
         }
 
-        public TService GetService<TService>() where TService : class 
+        public TService GetService<TService>() where TService : class
             => _services.GetRequiredService<TService>();
     }
 }

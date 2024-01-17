@@ -3,13 +3,13 @@ using Polly;
 using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Persistance.Entities;
 using Rx.Net.StateMachine.Persistance.Exceptions;
+using Rx.Net.StateMachine.Persistance.Extensions;
 using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Storage;
 using Rx.Net.StateMachine.WorkflowFactories;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reactive;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -65,10 +65,10 @@ namespace Rx.Net.StateMachine.Persistance
                 throw new ArgumentNullException("context");
 
             await using var uof = _uofFactory.Create();
-            var newSessionStateEntity = CreateNewSessionState(workflow.WorkflowId, uof, context);
-            var sessionState = ToSessionState(newSessionStateEntity);
+            var sessionStateMemento = await CreateNewSessionState(workflow.WorkflowId, uof, context);
+            var sessionState = ToSessionState(sessionStateMemento.Entity);
 
-            return await HandleSessionState(newSessionStateEntity, sessionState, workflow, uof);
+            return await HandleSessionState(sessionState, workflow, sessionStateMemento);
         }
 
         public struct WorkflowRunner<TSource>
@@ -101,10 +101,10 @@ namespace Rx.Net.StateMachine.Persistance
                 throw new ArgumentNullException("context");
 
             await using var uof = _uofFactory.Create();
-            var newSessionStateEntity = CreateNewSessionState(workflow.WorkflowId, uof, context);
-            var sessionState = ToSessionState(newSessionStateEntity);
+            var sessionStateMemento = await CreateNewSessionState(workflow.WorkflowId, uof, context);
+            var sessionState = ToSessionState(sessionStateMemento.Entity);
 
-            return await StartHandleSessionState<TSource>(source, newSessionStateEntity, sessionState, workflow, uof);
+            return await StartHandleSessionState<TSource>(source, sessionStateMemento.Entity, sessionState, workflow, sessionStateMemento);
         }
 
         public async Task RemoveDefaultSesssions(Guid? newDefaultSessionId, string userContextId)
@@ -127,13 +127,13 @@ namespace Rx.Net.StateMachine.Persistance
                     return;
             }
 
-            var uof = _uofFactory.Create();
+            await using var uof = _uofFactory.Create();
             var session = await uof.GetSessionState(sessionId) ?? throw new ArgumentException($"Could not find session {sessionId}");
-            session.Status = SessionStateStatus.Cancelled;
-            session.Result = $"Cancelled because {JsonSerializer.Serialize(result)}";
+            session.Entity.Status = SessionStateStatus.Cancelled;
+            session.Entity.Result = $"Cancelled because {JsonSerializer.Serialize(result)}";
             _logger.LogWarning($"Could not finish session {sessionId}. Cancelling...");
 
-            await uof.Save();
+            await session.Save();
         }
 
         public Task<List<HandlingResult>> HandleEvent<TEvent>(TEvent @event)
@@ -147,16 +147,15 @@ namespace Rx.Net.StateMachine.Persistance
                 await using var uof = _uofFactory.Create();
 
                 var sessionStates = await uof.GetSessionStates(@event);
-                _logger.LogInformation("Found {SessionIds} for event {EventType}\r\n{Event}", sessionStates.Select(s => s.SessionStateId), @event, JsonSerializer.Serialize(@event));
+
+                _logger.LogInformation("Found {SessionIds} for event {EventType}\r\n{Event}", sessionStates.Select(s => s.Entity.SessionStateId), @event, JsonSerializer.Serialize(@event));
 
                 if (sessionStates.Count == 0)
                     return new List<HandlingResult>();
 
-                List<HandlingResult> results = new List<HandlingResult>(sessionStates.Count);
-                foreach (var ss in sessionStates)
-                    results.Add(await HandleSessionStateEvent(ss, @event, uof));
+                var handlers = sessionStates.Select(ss => HandleSessionStateEvent(@event, ss));
 
-                return results;
+                return await HandleExceptions(handlers);
             });
         }
 
@@ -169,21 +168,42 @@ namespace Rx.Net.StateMachine.Persistance
             {
                 await using var uof = _uofFactory.Create();
 
-                    var sessionStates = await uof.GetSessionStates(events);
-                    _logger.LogInformation("Found {0} for events {EventTypes}\r\n{Events}", sessionStates.Select(s => s.SessionStateId), events, events.Select(ev => JsonSerializer.Serialize(ev)));
+                var sessionStates = await uof.GetSessionStates(events);
 
-                    if (sessionStates.Count == 0)
-                        return new List<HandlingResult>();
+                _logger.LogInformation("Found {0} for events {EventTypes}\r\n{Events}", sessionStates.Select(s => s.Entity.SessionStateId), events, events.Select(ev => JsonSerializer.Serialize(ev)));
 
-                    List<HandlingResult> results = new List<HandlingResult>(sessionStates.Count);
-                    foreach (var ss in sessionStates)
-                        results.Add(await HandleSessionStateEvents(ss, events, uof));
+                if (sessionStates.Count == 0)
+                    return new List<HandlingResult>();
 
-                    return results;
+                var handlers = sessionStates.Select(ss => HandleSessionStateEvents(events, ss));
+
+                return await HandleExceptions(handlers);
             });
         }
 
-        private SessionStateEntity CreateNewSessionState(string workflowId, ISessionStateUnitOfWork uof, TContext context)
+        private async Task<List<HandlingResult>> HandleExceptions(IEnumerable<Task<HandlingResult>> handlers)
+        {
+            var results = await Task.WhenAll(handlers.Select(r => r.ResultOrException()));
+
+            var exceptions = results.Where(r => r.Exception != null).Select(r => r.Exception!).ToList();
+
+            if (exceptions.Count > 0)
+            {
+                var concurrencyException = exceptions.OfType<ConcurrencyException>().FirstOrDefault();
+
+                if (concurrencyException != null)
+                    throw concurrencyException;
+
+                if (exceptions.Count == 1)
+                    throw exceptions.Single();
+
+                throw new AggregateException("Multiple tasks failed", exceptions);
+            }
+
+            return results.Select(r => r.Result!).ToList();
+        }
+
+        private Task<ISessionStateMemento> CreateNewSessionState(string workflowId, ISessionStateUnitOfWork uof, TContext context)
         {
             var sessionState = new SessionStateEntity
             {
@@ -198,27 +218,31 @@ namespace Rx.Net.StateMachine.Persistance
                 Context = context
             };
 
-            uof.Add(sessionState);
-
-            return sessionState;
+            return uof.Add(sessionState);
         }
 
-        private async Task<HandlingResult> HandleSessionStateEvent<TEvent>(SessionStateEntity sessionStateEntity, TEvent @event, ISessionStateUnitOfWork uof)
+        private async Task<HandlingResult> HandleSessionStateEvent<TEvent>(TEvent @event, ISessionStateMemento sessionStateMemento)
             where TEvent : class
         {
-
+            var sessionStateEntity = sessionStateMemento.Entity;
             var sessionState = ToSessionState(sessionStateEntity);
+
+            CheckIgnoreVersion(@event, sessionState);
+
             bool isAdded = StateMachine.AddEvent(sessionState, @event, _eventAwaiterResolver.GetEventAwaiters(@event));
             if (!isAdded)
                 return HandlingResult.Ignored(sessionStateEntity.SessionStateId, sessionState.Context);
 
-            return await HandleSessionState(sessionStateEntity, sessionState, uof);
+            return await HandleSessionState(sessionState, sessionStateMemento);
         }
 
-        private async Task<HandlingResult> HandleSessionStateEvents(SessionStateEntity sessionStateEntity, IEnumerable<object> events, ISessionStateUnitOfWork uof)
+        private async Task<HandlingResult> HandleSessionStateEvents(IEnumerable<object> events, ISessionStateMemento sessionStateMemento)
         {
-
+            SessionStateEntity sessionStateEntity = sessionStateMemento.Entity;
             var sessionState = ToSessionState(sessionStateEntity);
+
+            CheckIgnoreVersion(events, sessionState);
+
             bool isAdded = false;
             foreach (var @event in events)
                 isAdded = StateMachine.AddEvent(sessionState, @event, _eventAwaiterResolver.GetEventAwaiters(@event)) || isAdded;
@@ -226,33 +250,48 @@ namespace Rx.Net.StateMachine.Persistance
             if (!isAdded)
                 return HandlingResult.Ignored(sessionStateEntity.SessionStateId, sessionState.Context);
 
-            return await HandleSessionState(sessionStateEntity, sessionState, uof);
+            return await HandleSessionState(sessionState, sessionStateMemento);
         }
 
-        private async Task<HandlingResult> HandleSessionState(SessionStateEntity sessionStateEntity, SessionState sessionState, ISessionStateUnitOfWork uof)
+        private void CheckIgnoreVersion<TEvent>(TEvent @event, SessionState sessionState)
         {
-            return await HandleSessionState(sessionStateEntity, sessionState, await _workflowResolver.GetWorkflow(sessionState.WorkflowId), uof);
+            if (@event is IIgnoreSessionVersion ignoreSessionVersion
+                && ignoreSessionVersion.SessionId == sessionState.SessionStateId
+                && ignoreSessionVersion.Version == sessionState.Version
+            )
+                throw new ConcurrencyException($"Version {ignoreSessionVersion.Version} of session {ignoreSessionVersion.SessionId} is not finished");
         }
 
-        private async Task<HandlingResult> HandleSessionState(SessionStateEntity sessionStateEntity, SessionState sessionState, IWorkflow workflow, ISessionStateUnitOfWork uof)
+        private void CheckIgnoreVersion(IEnumerable<object> events, SessionState sessionState)
+        {
+            foreach(var @event in events)
+                CheckIgnoreVersion(@event, sessionState);
+        }
+
+        private async Task<HandlingResult> HandleSessionState(SessionState sessionState, ISessionStateMemento sessionStateMemento)
+        {
+            return await HandleSessionState(sessionState, await _workflowResolver.GetWorkflow(sessionState.WorkflowId), sessionStateMemento);
+        }
+
+        private async Task<HandlingResult> HandleSessionState(SessionState sessionState, IWorkflow workflow, ISessionStateMemento sessionStateMemento)
         {
             var storage = new SessionStateStorage(PersistStrategy.Default, st =>
             {
-                UpdateSessionStateEntity(st, sessionStateEntity);
+                UpdateSessionStateEntity(st, sessionStateMemento.Entity);
                 _logger.LogInformation($"Saving changes for {sessionState.SessionStateId}");
-                return uof.Save();
+                return sessionStateMemento.Save();
             });
 
             return await StateMachine.HandleWorkflow(sessionState, storage, workflow);
         }
 
-        private async Task<HandlingResult> StartHandleSessionState<TSource>(TSource source, SessionStateEntity sessionStateEntity, SessionState sessionState, IWorkflow<TSource> workflow, ISessionStateUnitOfWork uof)
+        private async Task<HandlingResult> StartHandleSessionState<TSource>(TSource source, SessionStateEntity sessionStateEntity, SessionState sessionState, IWorkflow<TSource> workflow, ISessionStateMemento sessionStateMemento)
         {
             var storage = new SessionStateStorage(PersistStrategy.Default, st =>
             {
                 UpdateSessionStateEntity(st, sessionStateEntity);
                 _logger.LogInformation($"Saving changes for {sessionState.SessionStateId}");
-                return uof.Save();
+                return sessionStateMemento.Save();
             });
 
             return await StateMachine.StartHandleWorkflow(source, sessionState, storage, workflow);

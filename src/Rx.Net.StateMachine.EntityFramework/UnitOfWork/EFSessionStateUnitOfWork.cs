@@ -1,20 +1,18 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Rx.Net.StateMachine.EntityFramework.Awaiters;
-using Rx.Net.StateMachine.EntityFramework.Extensions;
+using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.EntityFramework.Tables;
-using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
 using Rx.Net.StateMachine.EntityFramework.UnitOfWork;
 using Rx.Net.StateMachine.Extensions;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Persistance.Entities;
-using Rx.Net.StateMachine.Persistance.Exceptions;
-using Rx.Net.StateMachine.States;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text.Json;
 using System.Threading.Tasks;
+using static System.Collections.Specialized.BitVector32;
 
 namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 {
@@ -32,12 +30,17 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             public SessionStateEntity SessionState { get; }
             public SessionStateTable<TContext, TContextKey> Row { get; }
         }
-        private readonly Dictionary<Guid, SessionStateData> _loadedSessionStates;
+        private SessionStateDbContextFactory? _contextFactory;
         private DbContext? _sessionStateContext;
         private ContextKeySelector<TContext, TContextKey>? _contextKeySelector;
         private AwaitHandlerResolver<TContext, TContextKey>? _eventAwaiterResolver;
         private JsonSerializerOptions? _jsonSerializerOptions;
 
+        protected internal SessionStateDbContextFactory ContextFactory
+        {
+            get => _contextFactory ?? throw new ArgumentException($"{nameof(ContextFactory)} is not initialized");
+            set => _contextFactory = value;
+        }
         protected internal DbContext SessionStateDbContext
         {
             get => _sessionStateContext ?? throw new ArgumentException($"{nameof(SessionStateDbContext)} is not initialized");
@@ -61,10 +64,9 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 
         public EFSessionStateUnitOfWork()
         {
-            _loadedSessionStates = new Dictionary<Guid, SessionStateData>();
         }
 
-        public Task Add(SessionStateEntity sessionState)
+        public Task<ISessionStateMemento> Add(SessionStateEntity sessionState)
         {
             var row = new SessionStateTable<TContext, TContextKey>
             {
@@ -73,15 +75,16 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 CrearedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow,
             };
-            Map(sessionState, row);
+
             row.ContextId = ContextKeySelector.GetContextKey((TContext)sessionState.Context);
-            _loadedSessionStates.Add(row.SessionStateId, new SessionStateData(sessionState, row));
             SessionStateDbContext.Set<SessionStateTable<TContext, TContextKey>>().Add(row);
 
-            return Task.CompletedTask;
+            ISessionStateMemento result = new EFSessionStateMemento<TContext, TContextKey>(JsonSerializerOptions, SessionStateDbContext, sessionState, row);
+
+            return Task.FromResult(result);
         }
 
-        public async Task<IReadOnlyCollection<SessionStateEntity>> GetSessionStates(object @event)
+        public async Task<IReadOnlyCollection<ISessionStateMemento>> GetSessionStates(object @event)
         {
             var awaitHandler = EventAwaiterResolver.GetAwaiterHandler(@event.GetType());
 
@@ -90,12 +93,13 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 .Include(ss => ss.Awaiters)
                 .Where(GetAwaitersFilter(awaitHandler, @event))
                 .Where(awaitHandler.GetSessionStateFilter(@event))
+                .AsNoTracking()
                 .ToListAsync();
 
-            return MapToSessionStates(sessions);
+            return GetMemenots(sessions).ToList();
         }
 
-        public async Task<IReadOnlyCollection<SessionStateEntity>> GetSessionStates(IEnumerable<object> events)
+        public async Task<IReadOnlyCollection<ISessionStateMemento>> GetSessionStates(IEnumerable<object> events)
         {
             var awaitHandlers = events.Select(ev => new KeyValuePair<object, IAwaiterHandler<TContext, TContextKey>>(
                 ev,
@@ -116,12 +120,22 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 .Include(ss => ss.Context)
                 .Include(ss => ss.Awaiters)
                 .Where(filterExpression)
+                .AsNoTracking()
                 .ToListAsync();
 
-            return MapToSessionStates(sessions);
+            return GetMemenots(sessions).ToList();
         }
 
-        public async Task<SessionStateEntity?> GetSessionState(Guid sessionStateId)
+        private IEnumerable<ISessionStateMemento> GetMemenots(IReadOnlyList<SessionStateTable<TContext, TContextKey>> rows)
+        {
+            for (int i = 0; i < rows.Count; i++)
+                if (i == 0)
+                    yield return CreateMemento(rows[i]);
+                else
+                    yield return CreateMemento(rows[i], _contextFactory);
+        }
+
+        public async Task<ISessionStateMemento?> GetSessionState(Guid sessionStateId)
         {
             var session = await SessionStateDbContext.Set<SessionStateTable<TContext, TContextKey>>()
                 .Include(ss => ss.Context)
@@ -131,7 +145,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             if (session == null)
                 return null;
 
-            return MapToSessionState(session);
+            return CreateMemento(session);
         }
 
         private Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> GetAwaitersFilter(IAwaiterHandler<TContext, TContextKey> awaiterHandler, object @event)
@@ -142,28 +156,19 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             return ss => ss.Awaiters.Any(aw => aw.IsActive && awaiterIdentifiers.Contains(aw.Identifier));
         }
 
+        private EFSessionStateMemento<TContext, TContextKey> CreateMemento(SessionStateTable<TContext, TContextKey> row, SessionStateDbContextFactory? dbContextFactory = default)
+        {
+            var entity = new SessionStateEntity();
+            Map(row, entity);
+
+            return dbContextFactory == null
+                ? new EFSessionStateMemento<TContext, TContextKey>(JsonSerializerOptions, SessionStateDbContext, entity, row)
+                : new EFSessionStateMemento<TContext, TContextKey>(JsonSerializerOptions, dbContextFactory, entity, row);
+        }
+
         public void Dispose() => SessionStateDbContext.Dispose();
 
         public ValueTask DisposeAsync() => SessionStateDbContext.DisposeAsync();
-
-        public async Task Save()
-        {
-            foreach (var pair in _loadedSessionStates.Values)
-                Map(pair.SessionState, pair.Row);
-
-            var changedEntities = SessionStateDbContext.ChangeTracker.Entries<SessionStateTable<TContext, TContextKey>>().Where(e => e.State == EntityState.Modified);
-            foreach (var changed in changedEntities)
-                changed.Entity.UpdatedAt = DateTimeOffset.UtcNow;
-
-            try
-            {
-                await SessionStateDbContext.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException ex)
-            {
-                throw new ConcurrencyException($"Concurrency during updating {string.Join(", ", _loadedSessionStates.Keys)}", ex);
-            }
-        }
 
         private void Map(SessionStateTable<TContext, TContextKey> source, SessionStateEntity dest)
         {
@@ -188,60 +193,6 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             dest.Status = source.Status;
             dest.Result = source.Result;
             dest.Context = source.Context;
-        }
-
-        private void Map(SessionStateEntity source, SessionStateTable<TContext, TContextKey> dest)
-        {
-            dest.WorkflowId = source.WorkflowId;
-            dest.Counter = source.Counter;
-            dest.IsDefault = source.IsDefault;
-            dest.Steps = JsonSerializer.Serialize(source.Steps, JsonSerializerOptions);
-            dest.Items = JsonSerializer.Serialize(source.Items, JsonSerializerOptions);
-            dest.PastEvents = JsonSerializer.Serialize(source.PastEvents, JsonSerializerOptions);
-            dest.Awaiters.ToList().JoinTo(source.Awaiters)
-                .LeftKey(db => db.AwaiterId)
-                .RightKey(e => e.AwaiterId)
-                .Merge()
-                .Delete(db =>
-                {
-                    SessionStateDbContext.Remove(db);
-                    dest.Awaiters.Remove(db);
-                })
-                .Update((db, aw) => db.IsActive = dest.Status == SessionStateStatus.InProgress)
-                .Create(aw =>
-                {
-                    var awaiter = new SessionEventAwaiterTable<TContext, TContextKey>
-                    {
-                        SessionStateId = source.SessionStateId,
-                        SequenceNumber = aw.SequenceNumber,
-                        Name = aw.Name,
-                        Identifier = aw.Identifier,
-                        ContextId = dest.ContextId,
-                        IsActive = dest.Status == SessionStateStatus.InProgress
-                    };
-                    SessionStateDbContext.Add(awaiter);
-                    dest.Awaiters.Add(awaiter);
-                })
-                .Execute();
-
-            dest.Status = source.Status;
-            dest.Result = source.Result;
-            if (dest.Result?.Length > SessionStateTable<TContext, TContextKey>.ResultLength)
-                dest.Result = dest.Result.Substring(0, SessionStateTable<TContext, TContextKey>.ResultLength);
-        }
-
-        protected IReadOnlyCollection<SessionStateEntity> MapToSessionStates(IEnumerable<SessionStateTable<TContext, TContextKey>> source)
-        {
-            return source.Select(MapToSessionState).ToList();
-        }
-
-        protected SessionStateEntity MapToSessionState(SessionStateTable<TContext, TContextKey> source)
-        {
-            var entity = new SessionStateEntity();
-            Map(source, entity);
-            _loadedSessionStates.Add(source.SessionStateId, new SessionStateData(entity, source));
-
-            return entity;
         }
     }
 }

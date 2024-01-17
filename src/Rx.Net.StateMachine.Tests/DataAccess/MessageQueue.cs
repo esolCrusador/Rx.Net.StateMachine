@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Reactive.Threading.Tasks;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.Tests.DataAccess
@@ -10,6 +12,7 @@ namespace Rx.Net.StateMachine.Tests.DataAccess
     {
         private readonly Subject<object> _events = new Subject<object>();
         private readonly Subject<object> _handled = new Subject<object>();
+        private readonly Subject<(Exception Exception, object Target)> _failed = new();
 
         public void Dispose() => _events.Dispose();
 
@@ -21,9 +24,17 @@ namespace Rx.Net.StateMachine.Tests.DataAccess
 
         public async Task SendAndWait(object ev, int times = 1)
         {
-            var handled = _handled.Where(e => ev == e).Take(times).ToTask();
+            using CancellationTokenSource cancellation = new CancellationTokenSource();
+
+            var handled = _handled.Where(e => ev == e).Take(times).ToTask(cancellation.Token);
+            var failed = _failed.Where(f => f.Target == ev).Take(times).ToTask(cancellation.Token);
+
             await Send(ev);
-            await handled;
+
+            var task = await Task.WhenAny(handled, failed);
+            cancellation.Cancel();
+            if (task == failed)
+                throw (await failed).Exception;
         }
 
         public async Task WaitUntilHandled(Func<object, bool> eventFilter, int times = 1)
@@ -37,8 +48,15 @@ namespace Rx.Net.StateMachine.Tests.DataAccess
             {
                 return Observable.FromAsync(async () =>
                 {
-                    await handler((TEvent)ev);
-                    _handled.OnNext(ev);
+                    try
+                    {
+                        await handler((TEvent)ev);
+                        _handled.OnNext(ev);
+                    }
+                    catch(Exception ex)
+                    {
+                        _failed.OnNext((ex, ev));
+                    }
                 });
             }).Merge().Subscribe();
         }

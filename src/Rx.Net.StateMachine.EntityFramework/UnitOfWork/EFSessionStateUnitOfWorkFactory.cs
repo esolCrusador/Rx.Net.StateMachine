@@ -25,6 +25,7 @@ public class EFSessionStateUnitOfWorkFactory<TContext, TContextKey, TUnitOfWork>
     {
         var uof = new TUnitOfWork
         {
+            ContextFactory = _contextFactory,
             SessionStateDbContext = _contextFactory.CreateBase(),
             ContextKeySelector = _contextKeySelector,
             EventAwaiterResolver = _awaitHandlerResolver,
