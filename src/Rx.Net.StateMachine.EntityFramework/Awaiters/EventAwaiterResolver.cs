@@ -15,16 +15,21 @@ namespace Rx.Net.StateMachine.EntityFramework.Awaiters
         {
             _awaitHandlerResolver = awaitHandlerResolver;
         }
-        public IEnumerable<IEventAwaiter<TEvent>> GetEventAwaiters<TEvent>(TEvent @event)
-            where TEvent: class
+        public IReadOnlyCollection<IEventAwaiter<TEvent>> GetEventAwaiters<TEvent>(TEvent @event)
+            where TEvent : class
         {
-            return GetEventAwaiters(@event, typeof(TEvent)).Cast<IEventAwaiter<TEvent>>();
+            return GetEventAwaiters(@event, typeof(TEvent)).Cast<IEventAwaiter<TEvent>>().ToList();
         }
 
-        public IEnumerable<IEventAwaiter> GetEventAwaiters(object @event) =>
+        public IReadOnlyCollection<IEventAwaiter> GetEventAwaiters(object @event) =>
             GetEventAwaiters(@event, @event.GetType());
 
-        private IEnumerable<IEventAwaiter> GetEventAwaiters(object @event, Type eventType)
+        public IIgnoreSessionVersion? GetSessionVersionIgnore(object @event)
+        {
+            return _awaitHandlerResolver.GetAwaiterHandler(@event.GetType()).GetSessionVersionToIgnore(@event);
+        }
+
+        private IReadOnlyCollection<IEventAwaiter> GetEventAwaiters(object @event, Type eventType)
         {
             var awaiterHandler = _awaitHandlerResolver.GetAwaiterHandler(eventType);
 

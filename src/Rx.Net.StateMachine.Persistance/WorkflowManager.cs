@@ -253,9 +253,10 @@ namespace Rx.Net.StateMachine.Persistance
             return await HandleSessionState(sessionState, sessionStateMemento);
         }
 
-        private void CheckIgnoreVersion<TEvent>(TEvent @event, SessionState sessionState)
+        private void CheckIgnoreVersion(object @event, SessionState sessionState)
         {
-            if (@event is IIgnoreSessionVersion ignoreSessionVersion
+            var ignoreSessionVersion = _eventAwaiterResolver.GetSessionVersionIgnore(@event);
+            if (ignoreSessionVersion != null
                 && ignoreSessionVersion.SessionId == sessionState.SessionStateId
                 && ignoreSessionVersion.Version == sessionState.Version
             )
@@ -264,7 +265,7 @@ namespace Rx.Net.StateMachine.Persistance
 
         private void CheckIgnoreVersion(IEnumerable<object> events, SessionState sessionState)
         {
-            foreach(var @event in events)
+            foreach (var @event in events)
                 CheckIgnoreVersion(@event, sessionState);
         }
 

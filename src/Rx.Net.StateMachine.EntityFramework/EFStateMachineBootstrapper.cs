@@ -108,7 +108,8 @@ namespace Rx.Net.StateMachine.EntityFramework
                 else
                     _services.AddSingleton<IAwaiterHandler<TContext, TContextKey>>(new DefaultAwaiterHandler<TContext, TContextKey, TEvent>(
                         regBuilder._contextFilter,
-                        regBuilder._awaiterIdTypes
+                        regBuilder._awaiterIdTypes,
+                        regBuilder._getSessionVersionToIgnore
                     ));
 
                 return this;
@@ -120,6 +121,7 @@ namespace Rx.Net.StateMachine.EntityFramework
                 public IAwaiterHandler<TContext, TContextKey, TEvent>? _awaiterHandler { get; private set; }
                 public Func<TEvent, Expression<Func<SessionStateTable<TContext, TContextKey>, bool>>>? _contextFilter { get; private set; }
                 public List<Type> _awaiterIdTypes { get; } = new List<Type>();
+                public Func<TEvent, IIgnoreSessionVersion>? _getSessionVersionToIgnore;
 
                 public EventHandlerRegistrationBuilder()
                 {
@@ -152,8 +154,14 @@ namespace Rx.Net.StateMachine.EntityFramework
                     if (awaiterIdType.GetConstructor(new[] { typeof(TEvent) }) == null && awaiterIdType.GetConstructor(new Type[0]) == null)
                         throw new ArgumentException($"AwaiterId {typeof(TAwaiterId).FullName} must have constructor with argument {typeof(TEvent)} or constructor without arguments");
 
-
                     _awaiterIdTypes.Add(typeof(TAwaiterId));
+                    return this;
+                }
+
+                public EventHandlerRegistrationBuilder<TEvent> WithIgnoreSessionVersion(Func<TEvent, IgnoreSessionVersion> getSessionVersionToIgnore)
+                {
+                    _getSessionVersionToIgnore = getSessionVersionToIgnore;
+
                     return this;
                 }
             }

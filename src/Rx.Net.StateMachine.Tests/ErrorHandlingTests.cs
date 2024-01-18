@@ -26,7 +26,9 @@ namespace Rx.Net.StateMachine.Tests
 
             builder.ForContextBuilder()
                 .AddAwaiterHandler<BroadcastMessage>(b => b.WithAwaiter<BroadcastMessageAwaiter>())
-                .AddAwaiterHandler<MessageHandled>(b => b.WithAwaiter<MessageHandledAwaiter>());
+                .AddAwaiterHandler<MessageHandled>(b => b.WithAwaiter<MessageHandledAwaiter>()
+                    .WithIgnoreSessionVersion(mh => new IgnoreSessionVersion { SessionId = mh.SessionId, Version = mh.Version })
+                );
 
 
             _ctx = builder.Build();
@@ -309,7 +311,7 @@ namespace Rx.Net.StateMachine.Tests
             }
         }
 
-        class MessageHandled : IIgnoreSessionVersion
+        class MessageHandled
         {
             public required Guid SessionId { get; set; }
             public required Guid MessageId { get; set; }
@@ -337,14 +339,20 @@ namespace Rx.Net.StateMachine.Tests
             }
         }
 
-        class MessageHandledAwaiter : IEventAwaiter<MessageHandled>
+        class MessageHandledAwaiter : IEventAwaiter<MessageHandled>, IIgnoreSessionVersion
         {
             public string AwaiterId => $"{nameof(MessageHandled)}-{MessageId:n}";
 
             public Guid MessageId { get; }
 
+            public Guid SessionId { get; }
+
+            public int Version { get; }
+
             public MessageHandledAwaiter(MessageHandled messageHandled) : this(messageHandled.MessageId)
             {
+                SessionId = messageHandled.SessionId;
+                Version = messageHandled.Version;
             }
 
             public MessageHandledAwaiter(Guid messageId)

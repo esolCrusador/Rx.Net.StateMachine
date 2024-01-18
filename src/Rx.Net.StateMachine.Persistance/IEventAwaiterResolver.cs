@@ -1,12 +1,14 @@
 ﻿using Rx.Net.StateMachine.Events;
+using System;
 using System.Collections.Generic;
 
 namespace Rx.Net.StateMachine.Persistance
 {
     public interface IEventAwaiterResolver
     {
-        public IEnumerable<IEventAwaiter<TEvent>> GetEventAwaiters<TEvent>(TEvent @event)
+        public IReadOnlyCollection<IEventAwaiter<TEvent>> GetEventAwaiters<TEvent>(TEvent @event)
             where TEvent: class;
-        public IEnumerable<IEventAwaiter> GetEventAwaiters(object @event);
+        public IReadOnlyCollection<IEventAwaiter> GetEventAwaiters(object @event);
+        public IIgnoreSessionVersion? GetSessionVersionIgnore(object @event);
     }
 }
