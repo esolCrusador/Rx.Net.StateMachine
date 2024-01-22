@@ -23,6 +23,8 @@ namespace Rx.Net.StateMachine.Tests
             builder.AddEventHandler<BroadcastMessage>(HandleEvent<BroadcastMessage>);
             builder.AddEventHandler<MessageHandled>(HandleResult);
             builder.AddWorkflow<BroadcastSubscriberWorkflow>().AddWorkflow<BroadcastMultipleMessagesWorkflow>().AddWorkflow<HandleBroadcastedMessageWorkflow>();
+            builder.WithWorkflowFatal<WorkflowFatalException>();
+            builder.WithWorkflowFatal<SomeTimesFatalException>(ex => ex.Message == "Fatal");
 
             builder.ForContextBuilder()
                 .AddAwaiterHandler<BroadcastMessage>(b => b.WithAwaiter<BroadcastMessageAwaiter>())
@@ -128,6 +130,52 @@ namespace Rx.Net.StateMachine.Tests
             await _ctx.MessageQueue.SendAndWait(new BroadcastMessage { MessageId = messageId });
 
             (await handled.Task).Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task Should_Not_Retry_On_Workflow_Fatal_Exception()
+        {
+            var messageId = Guid.NewGuid();
+            var userContext = await _ctx.UserContextRepository.GetUserOrCreateContext(1, 1, "1", "1");
+            await _ctx.WorkflowManager.Start<Guid>(userContext, messageId).Workflow<BroadcastSubscriberWorkflow>();
+
+            _handleResult = _ =>
+            {
+                throw new WorkflowFatalException();
+            };
+
+            await _ctx.MessageQueue.SendAndWait(new BroadcastMessage { MessageId = messageId }); // Not Failed
+        }
+
+        [Fact]
+        public async Task Should_Not_Retry_On_Workflow_Sometimes_Fatal_Exception()
+        {
+            var messageId = Guid.NewGuid();
+            var userContext = await _ctx.UserContextRepository.GetUserOrCreateContext(1, 1, "1", "1");
+            await _ctx.WorkflowManager.Start<Guid>(userContext, messageId).Workflow<BroadcastSubscriberWorkflow>();
+
+            _handleResult = _ =>
+            {
+                throw new SomeTimesFatalException("Fatal");
+            };
+
+            await _ctx.MessageQueue.SendAndWait(new BroadcastMessage { MessageId = messageId }); // Not Failed
+        }
+
+        [Fact]
+        public async Task Should_Retry_On_Workflow_Sometimes_Fatal_Exception_Does_Not_Match_Condition()
+        {
+            var messageId = Guid.NewGuid();
+            var userContext = await _ctx.UserContextRepository.GetUserOrCreateContext(1, 1, "1", "1");
+            await _ctx.WorkflowManager.Start<Guid>(userContext, messageId).Workflow<BroadcastSubscriberWorkflow>();
+
+            _handleResult = _ =>
+            {
+                throw new SomeTimesFatalException("Not Fatal");
+            };
+
+            Func<Task> eventOne = () => _ctx.MessageQueue.SendAndWait(new BroadcastMessage { MessageId = messageId });
+            await eventOne.Should().ThrowAsync<SomeTimesFatalException>().WithMessage("Not Fatal");
         }
 
         [Fact]
@@ -358,6 +406,17 @@ namespace Rx.Net.StateMachine.Tests
             public MessageHandledAwaiter(Guid messageId)
             {
                 MessageId = messageId;
+            }
+        }
+
+        class WorkflowFatalException : Exception
+        {
+        }
+
+        class SomeTimesFatalException : Exception
+        {
+            public SomeTimesFatalException(string message) : base(message)
+            {
             }
         }
     }

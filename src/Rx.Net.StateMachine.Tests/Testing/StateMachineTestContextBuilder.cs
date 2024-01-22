@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Rx.Net.StateMachine.EntityFramework;
 using Rx.Net.StateMachine.Events;
+using Rx.Net.StateMachine.Exceptions;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Tests.Awaiters;
 using Rx.Net.StateMachine.Tests.Concurrency;
@@ -62,6 +63,20 @@ namespace Rx.Net.StateMachine.Tests.Testing
             where TWorkflowFactory : class, IWorkflow
         {
             _services.AddWorkflow<TWorkflowFactory>();
+            return this;
+        }
+
+        public StateMachineTestContextBuilder WithWorkflowFatal<TException>()
+            where TException : Exception
+        {
+            _services.WithWorkflowFatal<TException>();
+            return this;
+        }
+
+        public StateMachineTestContextBuilder WithWorkflowFatal<TException>(Func<TException, bool> filter)
+            where TException : Exception
+        {
+            _services.WithWorkflowFatal<TException>(filter);
             return this;
         }
 
