@@ -114,24 +114,42 @@ namespace Rx.Net.StateMachine.Persistance
 
         public async Task CancelSession(Guid sessionId, CancellationReason reason)
         {
-            await HandleEvent(new BeforeSessionCancelled(sessionId, reason));
-
-            var result = await HandleEvent(new SessionCancelled(sessionId, reason));
-            if (result.Count > 1)
-                throw new InvalidOperationException($"Invalid session {sessionId} handled {result.Count} times");
-
-            if (result.Count == 1)
+            Exception? exception = null;
+            List<HandlingResult>? result = null;
+            try
             {
-                var status = result[0].Status;
-                if (status != HandlingStatus.Ignored)
-                    return;
+                await HandleEvent(new BeforeSessionCancelled(sessionId, reason));
+
+                result = await HandleEvent(new SessionCancelled(sessionId, reason));
+                if (result.Count > 1)
+                    throw new InvalidOperationException($"Invalid session {sessionId} handled {result.Count} times");
+
+                if (result.Count == 1)
+                {
+                    var status = result[0].Status;
+                    if (status != HandlingStatus.Ignored)
+                        return;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to cancell session {sessionId}");
+                exception = ex;
             }
 
             await using var uof = _uofFactory.Create();
             var session = await uof.GetSessionState(sessionId) ?? throw new ArgumentException($"Could not find session {sessionId}");
-            session.Entity.Status = SessionStateStatus.Cancelled;
-            session.Entity.Result = $"Cancelled because {JsonSerializer.Serialize(result)}";
-            _logger.LogWarning($"Could not finish session {sessionId}. Cancelling...");
+            if (exception == null)
+            {
+                session.Entity.Status = SessionStateStatus.Cancelled;
+                session.Entity.Result = $"Cancelled because {JsonSerializer.Serialize(result)}";
+                _logger.LogWarning($"Could not finish session {sessionId}. Cancelling...");
+            }
+            else
+            {
+                session.Entity.Status = SessionStateStatus.Failed;
+                session.Entity.Result = exception.ToString();
+            }
 
             await session.Save();
         }
