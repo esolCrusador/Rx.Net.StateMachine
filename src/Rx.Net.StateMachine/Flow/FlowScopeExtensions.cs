@@ -38,18 +38,23 @@ namespace Rx.Net.StateMachine.Flow
             return new StateMachineFlow<TElement>(scope, Observable.FromAsync(() => execute()));
         }
 
-        public static IFlow<TResult> Loop<TResult>(this StateMachineScope scope, string prefix, Func<StateMachineScope, IFlow<TResult>> iteration, Func<TResult, bool>? exit = null)
+        public static IFlow<TResult> Loop<TResult>(this StateMachineScope scope, string prefix, Func<StateMachineScope, IFlow<TResult>> iteration, Func<TResult, bool> exit)
+        {
+            return Loop(scope, prefix, iteration, (result, scope) => exit(result));
+        }
+
+        public static IFlow<TResult> Loop<TResult>(this StateMachineScope scope, string prefix, Func<StateMachineScope, IFlow<TResult>> iteration, Func<TResult, StateMachineScope, bool>? exit = null)
         {
             return scope.StartFlow().SelectAsync(async () =>
                 LoopIteration(await scope.BeginRecursiveScope(prefix), iteration, exit)
             );
         }
 
-        private static IFlow<TResult> LoopIteration<TResult>(StateMachineScope input, Func<StateMachineScope, IFlow<TResult>> iteration, Func<TResult, bool>? exit = null)
+        private static IFlow<TResult> LoopIteration<TResult>(StateMachineScope input, Func<StateMachineScope, IFlow<TResult>> iteration, Func<TResult, StateMachineScope, bool>? exit = null)
         {
             return iteration(input).Select((r, scope) =>
             {
-                if (exit?.Invoke(r) == true)
+                if (exit?.Invoke(r, scope) == true)
                     return scope.StartFlow(r);
 
                 return scope.StartFlow(() => scope.IncreaseRecursionDepth())

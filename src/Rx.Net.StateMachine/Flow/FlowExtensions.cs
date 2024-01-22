@@ -64,16 +64,21 @@ namespace Rx.Net.StateMachine.Flow
             );
         }
 
-        public static IFlow<TResult> WhenAny<TResult>(this StateMachineScope scope, string name, params Func<StateMachineScope, IFlow<TResult>>[] observables)
+        public static IFlow<TResult> WhenAny<TResult>(this StateMachineScope scope, string name, IEnumerable<Func<StateMachineScope, IFlow<TResult>?>> factories)
         {
             var whenAnyScope = scope.BeginScope(name);
-            return new StateMachineFlow<TResult>(scope, Observable.Merge(observables.Select(obs => obs(whenAnyScope).Observable)).Take(1)
+            return new StateMachineFlow<TResult>(scope, Observable.Merge(factories.Select(f => f(whenAnyScope)).Where(flow => flow != null).Select(flow => flow!.Observable)).Take(1)
                 .Select(async result =>
                 {
                     await whenAnyScope.RemoveScopeAwaiters();
                     return result;
                 }).Concat()
             );
+        }
+
+        public static IFlow<TResult> WhenAny<TResult>(this StateMachineScope scope, string name, params Func<StateMachineScope, IFlow<TResult>?>[] observables)
+        {
+            return WhenAny(scope, name, (IEnumerable<Func<StateMachineScope, IFlow<TResult>?>>)observables);
         }
 
         public static IFlow<IList<TResult>> WhenAll<TResult>(this StateMachineScope scope, IEnumerable<IFlow<TResult>> flows)

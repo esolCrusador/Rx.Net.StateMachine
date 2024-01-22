@@ -19,5 +19,6 @@ namespace Rx.Net.StateMachine.Events
         Expired,
         SingleAllowed,
         ParentFinished,
+        NewVersionIssued,
     }
 }
