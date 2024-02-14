@@ -127,7 +127,7 @@ namespace Rx.Net.StateMachine.Persistance
                 if (result.Count == 1)
                 {
                     var status = result[0].Status;
-                    if (status != HandlingStatus.Ignored)
+                    if (status == HandlingStatus.Finished)
                         return;
                 }
             }
@@ -139,6 +139,9 @@ namespace Rx.Net.StateMachine.Persistance
 
             await using var uof = _uofFactory.Create();
             var session = await uof.GetSessionState(sessionId) ?? throw new ArgumentException($"Could not find session {sessionId}");
+            if (session.Entity.Status == SessionStateStatus.Completed)
+                return;
+
             if (exception == null)
             {
                 session.Entity.Status = SessionStateStatus.Cancelled;
