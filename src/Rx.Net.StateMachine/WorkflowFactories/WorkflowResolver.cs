@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.DependencyInjection;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -7,28 +8,41 @@ namespace Rx.Net.StateMachine.WorkflowFactories
 {
     public class WorkflowResolver : IWorkflowResolver
     {
-        private readonly Dictionary<string, IWorkflow> _workflowByIds;
-        private readonly Dictionary<Type, IWorkflow> _workflowByTypes;
+        private Dictionary<string, Type>? _workflowByIds;
+        private readonly IServiceProvider _serviceProvider;
 
-        public WorkflowResolver(IEnumerable<IWorkflow> workflowFactories)
+        public WorkflowResolver(IServiceProvider serviceProvider)
         {
-            _workflowByIds = workflowFactories.ToDictionary(wf => wf.WorkflowId);
-            _workflowByTypes = workflowFactories.ToDictionary(wf => wf.GetType());
+            _serviceProvider = serviceProvider;
         }
 
-        public Task<IWorkflow> GetWorkflow(string workflowId)
+        public Task<WorkflowSession> GetWorkflowSession(string workflowId)
         {
-            return Task.FromResult(_workflowByIds[workflowId]);
+            var scope = _serviceProvider.CreateAsyncScope();
+            var workflow = (IWorkflow)scope.ServiceProvider.GetRequiredService(GetWorkflowByIds(scope.ServiceProvider)[workflowId]);
+            BeforePersist beforePersist = session => Task.WhenAll(scope.ServiceProvider.GetServices<BeforePersist>().Select(bp => bp(session)));
+
+            return Task.FromResult(new WorkflowSession(scope, workflow, beforePersist));
         }
 
-        public async Task<IWorkflow<TSource>> GetWorkflow<TSource>(string workflowId)
+        public Task<WorkflowSession> GetWorkflowSession<TWorkflow>()
+            where TWorkflow : class, IWorkflow
         {
-            return (IWorkflow<TSource>)await GetWorkflow(workflowId);
+            var scope = _serviceProvider.CreateAsyncScope();
+            var wokrflow = scope.ServiceProvider.GetRequiredService<TWorkflow>();
+            BeforePersist beforePersist = session => Task.WhenAll(scope.ServiceProvider.GetServices<BeforePersist>().Select(bp => bp(session)));
+
+            return Task.FromResult(new WorkflowSession(scope, wokrflow, beforePersist));
         }
 
-        public Task<TWorkflow> GetWorkflow<TWorkflow>() where TWorkflow : IWorkflow
+        private Dictionary<string, Type> GetWorkflowByIds(IServiceProvider serviceProvider)
         {
-            return Task.FromResult((TWorkflow)_workflowByTypes[typeof(TWorkflow)]);
+            if (_workflowByIds == null)
+                lock (this)
+                    if (_workflowByIds == null)
+                        _workflowByIds = serviceProvider.GetServices<IWorkflow>().ToDictionary(wf => wf.WorkflowId, wf => wf.GetType());
+
+            return _workflowByIds;
         }
     }
 }

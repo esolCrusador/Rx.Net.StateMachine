@@ -111,6 +111,24 @@ namespace Rx.Net.StateMachine.Flow
             }).Concat());
         }
 
+        public static IFlow<TElement> Tap<TElement>(this IFlow<TElement> flow, Action<TElement> execute)
+        {
+            return new StateMachineFlow<TElement>(flow.Scope, flow.Observable.Select(e =>
+            {
+                execute(e);
+                return e;
+            }));
+        }
+
+        public static IFlow<TElement> Tap<TElement>(this IFlow<TElement> flow, Action<TElement, StateMachineScope> execute)
+        {
+            return new StateMachineFlow<TElement>(flow.Scope, flow.Observable.Select(e =>
+            {
+                execute(e, flow.Scope);
+                return e;
+            }));
+        }
+
         public delegate Task FinallyDelegate<TSource>(bool isExecuted, TSource? source, Exception? ex);
 
         public static IFlow<TSource> FinallyAsync<TSource>(this IFlow<TSource> flow, FinallyDelegate<TSource> handle)

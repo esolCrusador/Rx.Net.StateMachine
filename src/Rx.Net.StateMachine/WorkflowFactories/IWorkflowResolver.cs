@@ -4,8 +4,7 @@ namespace Rx.Net.StateMachine.WorkflowFactories
 {
     public interface IWorkflowResolver
     {
-        Task<IWorkflow> GetWorkflow(string workflowId);
-        Task<IWorkflow<TSource>> GetWorkflow<TSource>(string workflowId);
-        Task<TWorkflow> GetWorkflow<TWorkflow>() where TWorkflow : IWorkflow;
+        Task<WorkflowSession> GetWorkflowSession(string workflowId);
+        Task<WorkflowSession> GetWorkflowSession<TWorkflow>() where TWorkflow : class, IWorkflow;
     }
 }
