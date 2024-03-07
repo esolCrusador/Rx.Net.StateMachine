@@ -101,6 +101,19 @@ namespace Rx.Net.StateMachine.States
             return true;
         }
 
+        internal bool TryUpdateItem<TItem>(string itemId, Action<TItem> updateAction, JsonSerializerOptions options)
+        {
+            if (!_items.TryGetValue(itemId, out var itemValue))
+                return false;
+
+            var value = itemValue.DeserializeValue<TItem>(options)
+                ?? throw new InvalidOperationException($"Item {itemId} is null");
+            updateAction(value);
+
+            _items[itemId] = value;
+            return true;
+        }
+
         internal void UpdateItem<TItem>(string itemId, Func<TItem?, TItem> updateAction, JsonSerializerOptions options)
         {
             bool updated = TryUpdateItem(itemId, updateAction, options);
@@ -114,6 +127,12 @@ namespace Rx.Net.StateMachine.States
         }
 
         internal void AddOrUpdateItem<TItem>(string itemId, Func<TItem> createAction, Func<TItem, TItem> updateAction, JsonSerializerOptions options)
+        {
+            if (!TryUpdateItem(itemId, updateAction, options))
+                AddItem(itemId, createAction(), options);
+        }
+
+        internal void AddOrUpdateItem<TItem>(string itemId, Func<TItem> createAction, Action<TItem> updateAction, JsonSerializerOptions options)
         {
             if (!TryUpdateItem(itemId, updateAction, options))
                 AddItem(itemId, createAction(), options);
@@ -135,6 +154,14 @@ namespace Rx.Net.StateMachine.States
         {
             if (!TryGetItem<TItem>(itemId, options, out var item))
                 throw new ItemNotFoundException(itemId);
+
+            return item;
+        }
+
+        internal TItem? GetItemOrDefault<TItem>(string itemId, JsonSerializerOptions options, TItem? defaultItem = default)
+        {
+            if (!TryGetItem<TItem>(itemId, options, out var item))
+                return defaultItem;
 
             return item;
         }
