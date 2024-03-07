@@ -90,6 +90,20 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
+        public Task AddOrUpdateGlobalItem<TItem>(string itemId, Func<TItem> getItemToAdd, Func<TItem, TItem> updateItem)
+        {
+            SessionState.AddOrUpdateItem($"Global.{itemId}", getItemToAdd, updateItem, StateMachine.SerializerOptions);
+
+            return SessionStateStorage.PersistItemState(SessionState);
+        }
+
+        public Task AddOrUpdateGlobalItem<TItem>(string itemId, Func<TItem> getItemToAdd, Action<TItem> updateItem)
+        {
+            SessionState.AddOrUpdateItem($"Global.{itemId}", getItemToAdd, updateItem, StateMachine.SerializerOptions);
+
+            return SessionStateStorage.PersistItemState(SessionState);
+        }
+
         public Task UpdateItem<TItem>(string itemId, TItem item)
         {
             SessionState.UpdateItem(AddPrefix(itemId), item, StateMachine.SerializerOptions);
@@ -100,6 +114,11 @@ namespace Rx.Net.StateMachine
         public TItem? GetItem<TItem>(string itemId)
         {
             return SessionState.GetItem<TItem>(AddPrefix(itemId), StateMachine.SerializerOptions);
+        }
+
+        public TItem? GetGlobalItemOrDefault<TItem>(string itemId, TItem? defaultItem = default)
+        {
+            return SessionState.GetItemOrDefault<TItem>($"Global.{itemId}", StateMachine.SerializerOptions, defaultItem);
         }
 
         /// <summary>
