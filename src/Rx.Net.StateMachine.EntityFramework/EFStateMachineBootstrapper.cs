@@ -29,7 +29,6 @@ namespace Rx.Net.StateMachine.EntityFramework
             where TUnitOfWork : EFSessionStateUnitOfWork<TContext, TContextKey>, new()
             where TContext : class
         {
-            services.AddScoped<TContext>(sp => (TContext)sp.GetRequiredService<ContextProvider>().Context);
             services.AddSingleton(
                 sp => new SessionStateDbContextFactory<TDbContext>(() => createDbContext(sp))
             );

@@ -23,7 +23,16 @@ namespace Rx.Net.StateMachine.Persistance
             services.AddSingleton<WorkflowManager<TContext>>();
             services.AddSingleton(sp => new WorkflowManagerAccessor<TContext>(() => sp.GetRequiredService<WorkflowManager<TContext>>()));
             services.AddSingleton<WorkflowFatalExceptions>();
-            services.AddScoped<ContextProvider>();
+            services.UseWorkflowSessionValue<TContext>();
+
+            return services;
+        }
+
+        public static IServiceCollection UseWorkflowSessionValue<TValue>(this IServiceCollection services)
+            where TValue: class
+        {
+            services.AddScoped<WorkflowSessionValueProvider<TValue>>();
+            services.AddScoped<TValue>(sp => sp.GetRequiredService<WorkflowSessionValueProvider<TValue>>().Value);
 
             return services;
         }

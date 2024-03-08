@@ -16,10 +16,9 @@ namespace Rx.Net.StateMachine.WorkflowFactories
             _workflowRegistrations = workflowRegistrations;
         }
 
-        public Task<WorkflowSession> GetWorkflowSession(string workflowId, object context, BeforePersistScope? executeBeforePersist)
+        public Task<WorkflowSession> GetWorkflowSession(string workflowId, BeforePersistScope? executeBeforePersist)
         {
             var scope = _serviceProvider.CreateAsyncScope();
-            scope.ServiceProvider.GetRequiredService<ContextProvider>().SetContext(context);
             var workflow = (IWorkflow)scope.ServiceProvider.GetRequiredService(
                _workflowRegistrations.GetWorkflowByIds(scope.ServiceProvider)[workflowId]
             );
@@ -34,11 +33,10 @@ namespace Rx.Net.StateMachine.WorkflowFactories
             return Task.FromResult(new WorkflowSession(scope, workflow, beforePersist));
         }
 
-        public Task<WorkflowSession> GetWorkflowSession<TWorkflow>(object context, BeforePersistScope? executeBeforePersist)
+        public Task<WorkflowSession> GetWorkflowSession<TWorkflow>(BeforePersistScope? executeBeforePersist)
             where TWorkflow : class, IWorkflow
         {
             var scope = _serviceProvider.CreateAsyncScope();
-            scope.ServiceProvider.GetRequiredService<ContextProvider>().SetContext(context);
             var wokrflow = scope.ServiceProvider.GetRequiredService<TWorkflow>();
             BeforePersist beforePersist = async session =>
             {

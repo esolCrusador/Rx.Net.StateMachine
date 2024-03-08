@@ -4,7 +4,7 @@ namespace Rx.Net.StateMachine.WorkflowFactories
 {
     public interface IWorkflowResolver
     {
-        Task<WorkflowSession> GetWorkflowSession(string workflowId, object context, BeforePersistScope? executeBeforePersist);
-        Task<WorkflowSession> GetWorkflowSession<TWorkflow>(object context, BeforePersistScope? executeBeforePersist) where TWorkflow : class, IWorkflow;
+        Task<WorkflowSession> GetWorkflowSession(string workflowId, BeforePersistScope? executeBeforePersist);
+        Task<WorkflowSession> GetWorkflowSession<TWorkflow>(BeforePersistScope? executeBeforePersist) where TWorkflow : class, IWorkflow;
     }
 }
