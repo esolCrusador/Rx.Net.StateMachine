@@ -19,9 +19,11 @@ namespace Rx.Net.StateMachine.Persistance
                 services.AddSingleton(jsonSerializerOptions);
             services.AddSingleton<StateMachine>();
             services.AddSingleton<IWorkflowResolver, WorkflowResolver>();
+            services.AddSingleton<WorkflowRegistrations>();
             services.AddSingleton<WorkflowManager<TContext>>();
             services.AddSingleton(sp => new WorkflowManagerAccessor<TContext>(() => sp.GetRequiredService<WorkflowManager<TContext>>()));
             services.AddSingleton<WorkflowFatalExceptions>();
+            services.AddScoped<ContextProvider>();
 
             return services;
         }
