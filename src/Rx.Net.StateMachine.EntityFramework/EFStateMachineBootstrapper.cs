@@ -7,6 +7,7 @@ using Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork;
 using Rx.Net.StateMachine.EntityFramework.UnitOfWork;
 using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Persistance;
+using Rx.Net.StateMachine.WorkflowFactories;
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
@@ -128,7 +129,7 @@ namespace Rx.Net.StateMachine.EntityFramework
                 }
 
                 public EventHandlerRegistrationBuilder<TEvent> WithAwaiterHandler<TAwaiterHandler>()
-                    where TAwaiterHandler: class, IAwaiterHandler<TContext, TContextKey, TEvent>
+                    where TAwaiterHandler : class, IAwaiterHandler<TContext, TContextKey, TEvent>
                 {
                     _awaiterHandlerType = typeof(TAwaiterHandler);
                     return this;
@@ -148,7 +149,7 @@ namespace Rx.Net.StateMachine.EntityFramework
                 }
 
                 public EventHandlerRegistrationBuilder<TEvent> WithAwaiter<TAwaiterId>()
-                    where TAwaiterId: IEventAwaiter
+                    where TAwaiterId : IEventAwaiter
                 {
                     var awaiterIdType = typeof(TAwaiterId);
                     if (awaiterIdType.GetConstructor(new[] { typeof(TEvent) }) == null && awaiterIdType.GetConstructor(new Type[0]) == null)
