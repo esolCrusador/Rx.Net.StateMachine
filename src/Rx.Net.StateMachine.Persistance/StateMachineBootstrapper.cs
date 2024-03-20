@@ -53,11 +53,12 @@ namespace Rx.Net.StateMachine.Persistance
             return services;
         }
 
-        public static IServiceCollection AddWorkflow<TWorkflow>(this IServiceCollection services)
+        public static IServiceCollection AddWorkflow<TWorkflow>(this IServiceCollection services, string? workflowId = default)
             where TWorkflow : class, IWorkflow
         {
             services.AddScoped<TWorkflow>();
             services.AddScoped<IWorkflow>(sp => sp.GetRequiredService<TWorkflow>());
+            services.AddSingleton(WorkflowRegistration.Create<TWorkflow>(workflowId));
 
             var oldVersionsAttribute = typeof(TWorkflow).GetCustomAttribute<OldWorkflowVersionsAttribute>();
             if (oldVersionsAttribute != null)
@@ -66,6 +67,7 @@ namespace Rx.Net.StateMachine.Persistance
                 {
                     services.AddScoped(oldWorkflow);
                     services.AddScoped(typeof(IWorkflow), sp => sp.GetRequiredService(oldWorkflow));
+                    services.AddSingleton(WorkflowRegistration.Create(oldWorkflow));
                 }
             }
 

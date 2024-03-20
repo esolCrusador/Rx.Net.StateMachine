@@ -16,13 +16,6 @@ namespace Rx.Net.StateMachine.WorkflowFactories
         }
         public IWorkflow Workflow { get; }
         public BeforePersist BeforePersist { get; }
-        public void Provide<TValue>(TValue value)
-            where TValue : class
-        {
-            var vp = _scope.ServiceProvider.GetService<WorkflowSessionValueProvider<TValue>>()
-                ?? throw new InvalidOperationException($"Use serviceCollection.UseWorkflowSessionValue<{typeof(TValue).Name}>()");
-            vp.InitValue(value);
-        }
 
         public ValueTask DisposeAsync() => _scope.DisposeAsync();
     }

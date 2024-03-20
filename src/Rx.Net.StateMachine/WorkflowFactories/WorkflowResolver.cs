@@ -16,11 +16,13 @@ namespace Rx.Net.StateMachine.WorkflowFactories
             _workflowRegistrations = workflowRegistrations;
         }
 
-        public Task<WorkflowSession> GetWorkflowSession(string workflowId, BeforePersistScope? executeBeforePersist)
+        public WorkflowSession GetWorkflowSession(string workflowId, BeforePersistScope? executeBeforePersist, object userContext)
         {
             var scope = _serviceProvider.CreateAsyncScope();
+            scope.ServiceProvider.ProvideValue(userContext);
+
             var workflow = (IWorkflow)scope.ServiceProvider.GetRequiredService(
-               _workflowRegistrations.GetWorkflowByIds(scope.ServiceProvider)[workflowId]
+               _workflowRegistrations.GetWorkflow(workflowId)
             );
             BeforePersist beforePersist = async session =>
             {
@@ -30,13 +32,15 @@ namespace Rx.Net.StateMachine.WorkflowFactories
                 await Task.WhenAll(scope.ServiceProvider.GetServices<BeforePersist>().Select(bp => bp(session)));
             };
 
-            return Task.FromResult(new WorkflowSession(scope, workflow, beforePersist));
+            return new WorkflowSession(scope, workflow, beforePersist);
         }
 
-        public Task<WorkflowSession> GetWorkflowSession<TWorkflow>(BeforePersistScope? executeBeforePersist)
+        public WorkflowSession GetWorkflowSession<TWorkflow>(BeforePersistScope? executeBeforePersist, object userContext)
             where TWorkflow : class, IWorkflow
         {
             var scope = _serviceProvider.CreateAsyncScope();
+            scope.ServiceProvider.ProvideValue(userContext);
+
             var wokrflow = scope.ServiceProvider.GetRequiredService<TWorkflow>();
             BeforePersist beforePersist = async session =>
             {
@@ -46,7 +50,7 @@ namespace Rx.Net.StateMachine.WorkflowFactories
                 await Task.WhenAll(scope.ServiceProvider.GetServices<BeforePersist>().Select(bp => bp(session)));
             };
 
-            return Task.FromResult(new WorkflowSession(scope, wokrflow, beforePersist));
+            return new WorkflowSession(scope, wokrflow, beforePersist);
         }
     }
 }

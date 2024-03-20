@@ -58,15 +58,13 @@ namespace Rx.Net.StateMachine.Persistance
             }
             public async Task<HandlingResult> Workflow<TWorkflow>() where TWorkflow : class, IWorkflow
             {
-                await using var workflowSession = await _workflowResolver.GetWorkflowSession<TWorkflow>(_beforePersistScope);
-                workflowSession.Provide(_context);
+                await using var workflowSession = _workflowResolver.GetWorkflowSession<TWorkflow>(_beforePersistScope, _context);
                 return await _workflowManager.StartHandle(workflowSession, _context);
             }
 
             public async Task<HandlingResult> Workflow(string workflowId)
             {
-                await using var workflowSession = await _workflowResolver.GetWorkflowSession(workflowId, _beforePersistScope);
-                workflowSession.Provide(_context);
+                await using var workflowSession = _workflowResolver.GetWorkflowSession(workflowId, _beforePersistScope, _context);
                 return await _workflowManager.StartHandle(workflowSession, _context);
             }
         }
@@ -110,15 +108,13 @@ namespace Rx.Net.StateMachine.Persistance
 
             public async Task<HandlingResult> Workflow<TWorkflow>() where TWorkflow : class, IWorkflow<TSource>
             {
-                await using var workflowSession = await _workflowResolver.GetWorkflowSession<TWorkflow>(_beforePersistScope);
-                workflowSession.Provide(_context);
+                await using var workflowSession = _workflowResolver.GetWorkflowSession<TWorkflow>(_beforePersistScope, _context);
                 return await _workflowManager.StartHandle(_source, workflowSession, _context);
             }
 
             public async Task<HandlingResult> Workflow(string workflowId)
             {
-                await using var workflowSession = await _workflowResolver.GetWorkflowSession(workflowId, _beforePersistScope);
-                workflowSession.Provide(_context);
+                await using var workflowSession = _workflowResolver.GetWorkflowSession(workflowId, _beforePersistScope, _context);
                 return await _workflowManager.StartHandle(_source, workflowSession, _context);
             }
         }
@@ -323,8 +319,7 @@ namespace Rx.Net.StateMachine.Persistance
 
         private async Task<HandlingResult> HandleSessionState(SessionState sessionState, ISessionStateMemento sessionStateMemento, BeforePersistScope? beforePersist)
         {
-            await using var workflowSession = await _workflowResolver.GetWorkflowSession(sessionState.WorkflowId, beforePersist);
-            workflowSession.Provide((TContext)sessionState.Context);
+            await using var workflowSession = _workflowResolver.GetWorkflowSession(sessionState.WorkflowId, beforePersist, sessionState.Context);
             return await HandleSessionState(sessionState, workflowSession, sessionStateMemento);
         }
 
