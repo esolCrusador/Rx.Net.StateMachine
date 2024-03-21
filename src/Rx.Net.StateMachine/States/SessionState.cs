@@ -138,6 +138,9 @@ namespace Rx.Net.StateMachine.States
                 AddItem(itemId, createAction(), options);
         }
 
+        internal void AddOrUpdateItem<TItem>(string itemId, TItem item) => 
+            _items[itemId] = item;
+
         internal bool TryGetItem<TItem>(string itemId, JsonSerializerOptions options, [MaybeNullWhen(false)] out TItem? item)
         {
             if (!_items.TryGetValue(itemId, out object? itemValue))

@@ -11,8 +11,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
-using static System.Collections.Specialized.BitVector32;
 
 namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 {
@@ -66,7 +66,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         {
         }
 
-        public Task<ISessionStateMemento> Add(SessionStateEntity sessionState)
+        public ISessionStateMemento Add(SessionStateEntity sessionState)
         {
             var row = new SessionStateTable<TContext, TContextKey>
             {
@@ -81,10 +81,10 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 
             ISessionStateMemento result = new EFSessionStateMemento<TContext, TContextKey>(JsonSerializerOptions, SessionStateDbContext, sessionState, row);
 
-            return Task.FromResult(result);
+            return result;
         }
 
-        public async Task<IReadOnlyCollection<ISessionStateMemento>> GetSessionStates(object @event)
+        public async Task<IReadOnlyCollection<ISessionStateMemento>> GetSessionStates(object @event, CancellationToken cancellationToken)
         {
             var awaitHandler = EventAwaiterResolver.GetAwaiterHandler(@event.GetType());
 
@@ -94,12 +94,12 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 .Where(GetAwaitersFilter(awaitHandler, @event))
                 .Where(awaitHandler.GetSessionStateFilter(@event))
                 .AsNoTracking()
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             return GetMemenots(sessions).ToList();
         }
 
-        public async Task<IReadOnlyCollection<ISessionStateMemento>> GetSessionStates(IEnumerable<object> events)
+        public async Task<IReadOnlyCollection<ISessionStateMemento>> GetSessionStates(IEnumerable<object> events, CancellationToken cancellationToken)
         {
             var awaitHandlers = events.Select(ev => new KeyValuePair<object, IAwaiterHandler<TContext, TContextKey>>(
                 ev,
@@ -121,7 +121,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 .Include(ss => ss.Awaiters)
                 .Where(filterExpression)
                 .AsNoTracking()
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             return GetMemenots(sessions).ToList();
         }
@@ -135,12 +135,12 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                     yield return CreateMemento(rows[i], _contextFactory);
         }
 
-        public async Task<ISessionStateMemento?> GetSessionState(Guid sessionStateId)
+        public async Task<ISessionStateMemento?> GetSessionState(Guid sessionStateId, CancellationToken cancellationToken)
         {
             var session = await SessionStateDbContext.Set<SessionStateTable<TContext, TContextKey>>()
                 .Include(ss => ss.Context)
                 .Include(ss => ss.Awaiters)
-                .FirstOrDefaultAsync(ss => ss.SessionStateId == sessionStateId);
+                .FirstOrDefaultAsync(ss => ss.SessionStateId == sessionStateId, cancellationToken);
 
             if (session == null)
                 return null;

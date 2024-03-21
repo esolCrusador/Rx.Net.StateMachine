@@ -90,6 +90,13 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
+        public Task AddOrUpdateItem<TItem>(string itemId, TItem item)
+        {
+            SessionState.AddOrUpdateItem(AddPrefix(itemId), item);
+
+            return SessionStateStorage.PersistItemState(SessionState);
+        }
+
         public Task AddOrUpdateGlobalItem<TItem>(string itemId, Func<TItem> getItemToAdd, Func<TItem, TItem> updateItem)
         {
             SessionState.AddOrUpdateItem($"Global.{itemId}", getItemToAdd, updateItem, StateMachine.SerializerOptions);

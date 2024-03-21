@@ -78,7 +78,7 @@ namespace Rx.Net.StateMachine.Persistance
                 throw new ArgumentNullException("context");
 
             await using var uof = _uofFactory.Create();
-            var sessionStateMemento = await CreateNewSessionState(workflowSession.Workflow.WorkflowId, uof, context);
+            var sessionStateMemento = CreateNewSessionState(workflowSession.Workflow.WorkflowId, uof, context);
             var sessionState = ToSessionState(sessionStateMemento.Entity);
 
             return await HandleSessionState(sessionState, workflowSession, sessionStateMemento);
@@ -128,7 +128,7 @@ namespace Rx.Net.StateMachine.Persistance
                 throw new ArgumentNullException("context");
 
             await using var uof = _uofFactory.Create();
-            var sessionStateMemento = await CreateNewSessionState(workflowSession.Workflow.WorkflowId, uof, context);
+            var sessionStateMemento = CreateNewSessionState(workflowSession.Workflow.WorkflowId, uof, context);
             var sessionState = ToSessionState(sessionStateMemento.Entity);
 
             return await StartHandleSessionState<TSource>(source, sessionStateMemento.Entity, sessionState, workflowSession, sessionStateMemento);
@@ -165,7 +165,7 @@ namespace Rx.Net.StateMachine.Persistance
             }
 
             await using var uof = _uofFactory.Create();
-            var session = await uof.GetSessionState(sessionId) ?? throw new ArgumentException($"Could not find session {sessionId}");
+            var session = await uof.GetSessionState(sessionId, cancellationToken) ?? throw new ArgumentException($"Could not find session {sessionId}");
             if (session.Entity.Status == SessionStateStatus.Completed)
                 return;
 
@@ -184,6 +184,14 @@ namespace Rx.Net.StateMachine.Persistance
             await session.Save();
         }
 
+        public async Task<SessionStateStatus?> GetStatus(Guid sessionId, CancellationToken cancellationToken)
+        {
+            await using var ouf = _uofFactory.Create();
+            var memento = await ouf.GetSessionState(sessionId, cancellationToken);
+
+            return memento?.Entity.Status;
+        }
+
         public Task<List<HandlingResult>> HandleEvent<TEvent>(TEvent @event, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
             where TEvent : class
         {
@@ -194,7 +202,7 @@ namespace Rx.Net.StateMachine.Persistance
             {
                 await using var uof = _uofFactory.Create();
 
-                var sessionStates = await uof.GetSessionStates(@event);
+                var sessionStates = await uof.GetSessionStates(@event, cancellationToken);
 
                 _logger.LogInformation("Found {SessionIds} for event {EventType}\r\n{Event}", sessionStates.Select(s => s.Entity.SessionStateId), @event, JsonSerializer.Serialize(@event));
 
@@ -216,7 +224,7 @@ namespace Rx.Net.StateMachine.Persistance
             {
                 await using var uof = _uofFactory.Create();
 
-                var sessionStates = await uof.GetSessionStates(events);
+                var sessionStates = await uof.GetSessionStates(events, cancellationToken);
 
                 _logger.LogInformation("Found {0} for events {EventTypes}\r\n{Events}", sessionStates.Select(s => s.Entity.SessionStateId), events, events.Select(ev => JsonSerializer.Serialize(ev)));
 
@@ -251,7 +259,7 @@ namespace Rx.Net.StateMachine.Persistance
             return results.Select(r => r.Result!).ToList();
         }
 
-        private Task<ISessionStateMemento> CreateNewSessionState(string workflowId, ISessionStateUnitOfWork uof, TContext context)
+        private ISessionStateMemento CreateNewSessionState(string workflowId, ISessionStateUnitOfWork uof, TContext context)
         {
             var sessionState = new SessionStateEntity
             {
