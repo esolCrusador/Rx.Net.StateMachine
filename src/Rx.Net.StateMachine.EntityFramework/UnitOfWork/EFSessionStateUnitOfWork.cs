@@ -152,8 +152,10 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         {
             var awaiterIdentifiers = awaiterHandler.GetAwaiterIdTypes()
                 .Select(at => AwaiterExtensions.CreateAwaiter(at, @event).AwaiterId).ToList();
+            var sessionId = awaiterHandler.GetStaleSessionVersion(@event)?.SessionId;
 
-            return ss => ss.Awaiters.Any(aw => aw.IsActive && awaiterIdentifiers.Contains(aw.Identifier));
+            return ss => (sessionId != null && ss.SessionStateId == sessionId)
+                || ss.Awaiters.Any(aw => aw.IsActive && awaiterIdentifiers.Contains(aw.Identifier));
         }
 
         private EFSessionStateMemento<TContext, TContextKey> CreateMemento(SessionStateTable<TContext, TContextKey> row, SessionStateDbContextFactory? dbContextFactory = default)

@@ -2,7 +2,7 @@
 
 namespace Rx.Net.StateMachine.Events
 {
-    public class IgnoreSessionVersion : IIgnoreSessionVersion
+    public class StaleSessionVersion : IStaleSessionVersion
     {
         public required Guid SessionId { get; init; }
         public required int Version { get; init; }

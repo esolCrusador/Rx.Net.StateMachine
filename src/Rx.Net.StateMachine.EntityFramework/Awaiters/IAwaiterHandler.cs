@@ -10,7 +10,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Awaiters
     {
         public Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> GetSessionStateFilter(object ev);
         public IEnumerable<Type> GetAwaiterIdTypes();
-        public IIgnoreSessionVersion? GetSessionVersionToIgnore(object ev);
+        public IStaleSessionVersion? GetStaleSessionVersion(object ev);
     }
     public interface IAwaiterHandler<TContext, TContextKey, TEvent>: IAwaiterHandler<TContext, TContextKey>
     {

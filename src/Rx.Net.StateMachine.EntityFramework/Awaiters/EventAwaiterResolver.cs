@@ -24,9 +24,9 @@ namespace Rx.Net.StateMachine.EntityFramework.Awaiters
         public IReadOnlyCollection<IEventAwaiter> GetEventAwaiters(object @event) =>
             GetEventAwaiters(@event, @event.GetType());
 
-        public IIgnoreSessionVersion? GetSessionVersionIgnore(object @event)
+        public IStaleSessionVersion? GetStaleSessionVersion(object @event)
         {
-            return _awaitHandlerResolver.GetAwaiterHandler(@event.GetType()).GetSessionVersionToIgnore(@event);
+            return _awaitHandlerResolver.GetAwaiterHandler(@event.GetType()).GetStaleSessionVersion(@event);
         }
 
         private IReadOnlyCollection<IEventAwaiter> GetEventAwaiters(object @event, Type eventType)

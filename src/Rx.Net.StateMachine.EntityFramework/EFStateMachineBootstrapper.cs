@@ -110,7 +110,7 @@ namespace Rx.Net.StateMachine.EntityFramework
                     _services.AddSingleton<IAwaiterHandler<TContext, TContextKey>>(new DefaultAwaiterHandler<TContext, TContextKey, TEvent>(
                         regBuilder._contextFilter,
                         regBuilder._awaiterIdTypes,
-                        regBuilder._getSessionVersionToIgnore
+                        regBuilder._getStaleSessionVersion
                     ));
 
                 return this;
@@ -122,7 +122,7 @@ namespace Rx.Net.StateMachine.EntityFramework
                 public IAwaiterHandler<TContext, TContextKey, TEvent>? _awaiterHandler { get; private set; }
                 public Func<TEvent, Expression<Func<SessionStateTable<TContext, TContextKey>, bool>>>? _contextFilter { get; private set; }
                 public List<Type> _awaiterIdTypes { get; } = new List<Type>();
-                public Func<TEvent, IIgnoreSessionVersion>? _getSessionVersionToIgnore;
+                public Func<TEvent, IStaleSessionVersion>? _getStaleSessionVersion;
 
                 public EventHandlerRegistrationBuilder()
                 {
@@ -159,9 +159,9 @@ namespace Rx.Net.StateMachine.EntityFramework
                     return this;
                 }
 
-                public EventHandlerRegistrationBuilder<TEvent> WithIgnoreSessionVersion(Func<TEvent, IgnoreSessionVersion> getSessionVersionToIgnore)
+                public EventHandlerRegistrationBuilder<TEvent> WithStaleSessionVersion(Func<TEvent, StaleSessionVersion> getStaleSessionVersion)
                 {
-                    _getSessionVersionToIgnore = getSessionVersionToIgnore;
+                    _getStaleSessionVersion = getStaleSessionVersion;
 
                     return this;
                 }

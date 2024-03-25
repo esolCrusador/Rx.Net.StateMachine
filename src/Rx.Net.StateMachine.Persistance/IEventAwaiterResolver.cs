@@ -9,6 +9,6 @@ namespace Rx.Net.StateMachine.Persistance
         public IReadOnlyCollection<IEventAwaiter<TEvent>> GetEventAwaiters<TEvent>(TEvent @event)
             where TEvent: class;
         public IReadOnlyCollection<IEventAwaiter> GetEventAwaiters(object @event);
-        public IIgnoreSessionVersion? GetSessionVersionIgnore(object @event);
+        public IStaleSessionVersion? GetStaleSessionVersion(object @event);
     }
 }

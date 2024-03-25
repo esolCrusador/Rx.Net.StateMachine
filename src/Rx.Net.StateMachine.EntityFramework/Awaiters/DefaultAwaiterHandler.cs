@@ -11,12 +11,12 @@ namespace Rx.Net.StateMachine.EntityFramework.Awaiters
         private static readonly Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> DefaultFilter = ss => true;
         private Func<TEvent, Expression<Func<SessionStateTable<TContext, TContextKey>, bool>>>? SessionStateFilter { get; }
         private readonly IReadOnlyCollection<Type> _awaiterIdTypes;
-        private readonly Func<object, IIgnoreSessionVersion>? _getSessionVersionToIgnore;
+        private readonly Func<object, IStaleSessionVersion>? _getSessionVersionToIgnore;
 
         public DefaultAwaiterHandler(
             Func<TEvent, Expression<Func<SessionStateTable<TContext, TContextKey>, bool>>>? sessionStateFilter, 
             IReadOnlyCollection<Type> awaiterIdTypes,
-            Func<TEvent, IIgnoreSessionVersion>? getSessionVersionToIgnore
+            Func<TEvent, IStaleSessionVersion>? getSessionVersionToIgnore
         )
         {
             SessionStateFilter = sessionStateFilter;
@@ -32,7 +32,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Awaiters
         public Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> GetSessionStateFilter(object ev) =>
             GetSessionStateFilter((TEvent)ev);
 
-        public IIgnoreSessionVersion? GetSessionVersionToIgnore(object ev) =>
+        public IStaleSessionVersion? GetStaleSessionVersion(object ev) =>
             _getSessionVersionToIgnore?.Invoke(ev);
     }
 }

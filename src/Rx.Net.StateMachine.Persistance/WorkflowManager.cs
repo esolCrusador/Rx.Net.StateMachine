@@ -283,7 +283,7 @@ namespace Rx.Net.StateMachine.Persistance
             var sessionStateEntity = sessionStateMemento.Entity;
             var sessionState = ToSessionState(sessionStateEntity);
 
-            CheckIgnoreVersion(@event, sessionState);
+            CheckStaleVersion(@event, sessionState);
 
             bool isAdded = StateMachine.AddEvent(sessionState, @event, _eventAwaiterResolver.GetEventAwaiters(@event));
             if (!isAdded)
@@ -309,20 +309,20 @@ namespace Rx.Net.StateMachine.Persistance
             return await HandleSessionState(sessionState, sessionStateMemento, beforePersist);
         }
 
-        private void CheckIgnoreVersion(object @event, SessionState sessionState)
+        private void CheckStaleVersion(object @event, SessionState sessionState)
         {
-            var ignoreSessionVersion = _eventAwaiterResolver.GetSessionVersionIgnore(@event);
-            if (ignoreSessionVersion != null
-                && ignoreSessionVersion.SessionId == sessionState.SessionStateId
-                && ignoreSessionVersion.Version == sessionState.Version
+            var staleSessionVersion = _eventAwaiterResolver.GetStaleSessionVersion(@event);
+            if (staleSessionVersion != null
+                && staleSessionVersion.SessionId == sessionState.SessionStateId
+                && staleSessionVersion.Version == sessionState.Version
             )
-                throw new ConcurrencyException($"Version {ignoreSessionVersion.Version} of session {ignoreSessionVersion.SessionId} is not finished");
+                throw new ConcurrencyException($"Version {staleSessionVersion.Version} of session {staleSessionVersion.SessionId} is not finished");
         }
 
         private void CheckIgnoreVersion(IEnumerable<object> events, SessionState sessionState)
         {
             foreach (var @event in events)
-                CheckIgnoreVersion(@event, sessionState);
+                CheckStaleVersion(@event, sessionState);
         }
 
         private async Task<HandlingResult> HandleSessionState(SessionState sessionState, ISessionStateMemento sessionStateMemento, BeforePersistScope? beforePersist)
