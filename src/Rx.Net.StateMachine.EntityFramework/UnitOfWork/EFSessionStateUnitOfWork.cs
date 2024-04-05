@@ -6,6 +6,7 @@ using Rx.Net.StateMachine.EntityFramework.UnitOfWork;
 using Rx.Net.StateMachine.Extensions;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Persistance.Entities;
+using Rx.Net.StateMachine.Persistance.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -88,13 +89,25 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         {
             var awaitHandler = EventAwaiterResolver.GetAwaiterHandler(@event.GetType());
 
+            var filter = GetAwaitersFilter(awaitHandler, @event);
+            var sessionId = GetSessionId(awaitHandler, @event);
+            if (sessionId.HasValue)
+                filter = ExpressionExtensions.Aggregate(
+                    (r1, r2) => r1 || r2,
+                    s => s.SessionStateId == sessionId.Value,
+                    filter
+                );
+
             var sessions = await SessionStateDbContext.Set<SessionStateTable<TContext, TContextKey>>()
                 .Include(ss => ss.Context)
                 .Include(ss => ss.Awaiters)
-                .Where(GetAwaitersFilter(awaitHandler, @event))
+                .Where(filter)
                 .Where(awaitHandler.GetSessionStateFilter(@event))
                 .AsNoTracking()
                 .ToListAsync(cancellationToken);
+
+            if (sessionId.HasValue && !sessions.Exists(s => s.SessionStateId == sessionId.Value))
+                throw new ConcurrencyException($"Session {sessionId.Value} was not persisted");
 
             return GetMemenots(sessions).ToList();
         }
@@ -105,13 +118,28 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 ev,
                 EventAwaiterResolver.GetAwaiterHandler(ev.GetType()))
             );
+
+            var sessionIds = new List<Guid>();
             var filterExpression = awaitHandlers.Select(kvp =>
             {
                 var awaitHandler = kvp.Value;
                 var ev = kvp.Key;
+
+                var filter = GetAwaitersFilter(awaitHandler, ev);
+                var sessionId = awaitHandler.GetStaleSessionVersion(ev)?.SessionId;
+                if (sessionId.HasValue)
+                {
+                    sessionIds.Add(sessionId.Value);
+                    filter = ExpressionExtensions.Aggregate(
+                        (r1, r2) => r1 || r2,
+                        s => s.SessionStateId == sessionId.Value,
+                        filter
+                    );
+                }
+
                 return ExpressionExtensions.Aggregate(
                     (match1, match2) => match1 && match2,
-                    GetAwaitersFilter(awaitHandler, ev),
+                    filter,
                     awaitHandler.GetSessionStateFilter(ev)
                 );
             }).ToList().Aggregate((match1, match2) => match1 || match2);
@@ -122,6 +150,15 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 .Where(filterExpression)
                 .AsNoTracking()
                 .ToListAsync(cancellationToken);
+
+            if (sessionIds.Count != 0)
+            {
+                var notFoundSessions = sessionIds.Where(sessionId => !sessions.Any(s => s.SessionStateId == sessionId))
+                    .ToList();
+
+                if (notFoundSessions.Count != 0)
+                    throw new ConcurrencyException($"Sessions {string.Join(", ", notFoundSessions)} were not persisted");
+            }
 
             return GetMemenots(sessions).ToList();
         }
@@ -152,11 +189,12 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         {
             var awaiterIdentifiers = awaiterHandler.GetAwaiterIdTypes()
                 .Select(at => AwaiterExtensions.CreateAwaiter(at, @event).AwaiterId).ToList();
-            var sessionId = awaiterHandler.GetStaleSessionVersion(@event)?.SessionId;
 
-            return ss => (sessionId != null && ss.SessionStateId == sessionId)
-                || ss.Awaiters.Any(aw => aw.IsActive && awaiterIdentifiers.Contains(aw.Identifier));
+            return ss => ss.Awaiters.Any(aw => aw.IsActive && awaiterIdentifiers.Contains(aw.Identifier));
         }
+
+        private Guid? GetSessionId(IAwaiterHandler<TContext, TContextKey> awaiterHandler, object @event) =>
+            awaiterHandler.GetStaleSessionVersion(@event)?.SessionId;
 
         private EFSessionStateMemento<TContext, TContextKey> CreateMemento(SessionStateTable<TContext, TContextKey> row, SessionStateDbContextFactory? dbContextFactory = default)
         {
