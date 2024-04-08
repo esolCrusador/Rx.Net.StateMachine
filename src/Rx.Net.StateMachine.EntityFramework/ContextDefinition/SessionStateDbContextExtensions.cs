@@ -22,6 +22,7 @@ namespace Rx.Net.StateMachine.EntityFramework.ContextDfinition
             modelBuilder.Entity<SessionStateTable<TContext, TContextKey>>(builder =>
             {
                 builder.ToTable(options.Value.SessionStateTableName);
+                builder.HasIndex(i => new { i.Status, i.UpdatedAt, i.WorkflowId });
             });
             modelBuilder.Entity<SessionEventAwaiterTable<TContext, TContextKey>>(builder =>
             {

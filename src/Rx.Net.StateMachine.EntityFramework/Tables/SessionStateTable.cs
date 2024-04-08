@@ -1,4 +1,5 @@
-﻿using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
+﻿using Microsoft.EntityFrameworkCore;
+using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
 using Rx.Net.StateMachine.States;
 using System;
 using System.Collections.Generic;
@@ -11,7 +12,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tables
     {
         public const int ResultLength = 1024;
         [Key] public Guid SessionStateId { get; set; }
-        public string WorkflowId { get; set; }
+        [StringLength(256)] public string WorkflowId { get; set; }
         public bool IsDefault { get; set; }
         public int Counter { get; set; }
         public string Steps { get; set; }
