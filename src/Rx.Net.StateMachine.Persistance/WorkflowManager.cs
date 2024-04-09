@@ -24,18 +24,24 @@ namespace Rx.Net.StateMachine.Persistance
         private readonly ISessionStateUnitOfWorkFactory _uofFactory;
         private readonly IWorkflowResolver _workflowResolver;
         private readonly IEventAwaiterResolver _eventAwaiterResolver;
+        private readonly JsonSerializerOptions _jsonSerializerOptions;
 
         public StateMachine StateMachine { get; }
 
-        public WorkflowManager(ILogger<WorkflowManager<TContext>> logger, ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, IEventAwaiterResolver eventAwaiterResolver, StateMachine stateMachine)
+        public WorkflowManager(ILogger<WorkflowManager<TContext>> logger, ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, IEventAwaiterResolver eventAwaiterResolver, StateMachine stateMachine, JsonSerializerOptions jsonSerializerOptions)
         {
             _logger = logger;
             _uofFactory = uofFactory;
             _workflowResolver = workflowResolver;
             _eventAwaiterResolver = eventAwaiterResolver;
             StateMachine = stateMachine;
-            _concurrencyRetry = Policy.Handle<ConcurrencyException>()
-                .RetryForeverAsync(ex => _logger.LogWarning(ex.Message));
+            _jsonSerializerOptions = jsonSerializerOptions;
+            _concurrencyRetry = Policy.Handle<ConcurrencyException>().RetryForeverAsync(ex => _logger.LogWarning(ex.Message));
+        }
+
+        public WorkflowManager(ILogger<WorkflowManager<TContext>> logger, ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, IEventAwaiterResolver eventAwaiterResolver, StateMachine stateMachine)
+            : this(logger, uofFactory, workflowResolver, eventAwaiterResolver, stateMachine, new JsonSerializerOptions())
+        {
         }
 
         public struct WorkflowRunner
@@ -172,7 +178,7 @@ namespace Rx.Net.StateMachine.Persistance
             if (exception == null)
             {
                 session.Entity.Status = SessionStateStatus.Cancelled;
-                session.Entity.Result = $"Cancelled because {JsonSerializer.Serialize(result)}";
+                session.Entity.Result = $"Cancelled because {JsonSerializer.Serialize(result, _jsonSerializerOptions)}";
                 _logger.LogWarning($"Could not finish session {sessionId}. Cancelling...");
             }
             else
@@ -204,7 +210,7 @@ namespace Rx.Net.StateMachine.Persistance
 
                 var sessionStates = await uof.GetSessionStates(@event, cancellationToken);
 
-                _logger.LogInformation("Found {SessionIds} for event {EventType}\r\n{Event}", sessionStates.Select(s => s.Entity.SessionStateId), @event, JsonSerializer.Serialize(@event));
+                _logger.LogInformation("Found {SessionIds} for event {EventType}\r\n{Event}", sessionStates.Select(s => s.Entity.SessionStateId), @event.GetType().FullName, JsonSerializer.Serialize(@event, _jsonSerializerOptions));
 
                 if (sessionStates.Count == 0)
                     return new List<HandlingResult>();
@@ -226,7 +232,11 @@ namespace Rx.Net.StateMachine.Persistance
 
                 var sessionStates = await uof.GetSessionStates(events, cancellationToken);
 
-                _logger.LogInformation("Found {0} for events {EventTypes}\r\n{Events}", sessionStates.Select(s => s.Entity.SessionStateId), events, events.Select(ev => JsonSerializer.Serialize(ev)));
+                _logger.LogInformation("Found {0} for events {EventTypes}\r\n{Events}", 
+                    sessionStates.Select(s => s.Entity.SessionStateId), 
+                    string.Join(", ", events.Select(ev => ev.GetType().FullName)), 
+                    JsonSerializer.Serialize(events, _jsonSerializerOptions)
+                );
 
                 if (sessionStates.Count == 0)
                     return new List<HandlingResult>();
