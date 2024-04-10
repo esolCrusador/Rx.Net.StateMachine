@@ -12,6 +12,24 @@ namespace Rx.Net.StateMachine.Flow
             return new StateMachineFlow<TResult>(source.Scope, source.Observable.Select(s => execute(s)));
         }
 
+        public static IFlow<Unit> Select<TSource>(this IFlow<TSource> source, Action<TSource> execute)
+        {
+            return new StateMachineFlow<Unit>(source.Scope, source.Observable.Select(s =>
+            {
+                execute(s);
+                return Unit.Default;
+            }));
+        }
+
+        public static IFlow<Unit> Select<TSource>(this IFlow<TSource> source, Action<TSource, StateMachineScope> execute)
+        {
+            return new StateMachineFlow<Unit>(source.Scope, source.Observable.Select(s =>
+            {
+                execute(s, source.Scope);
+                return Unit.Default;
+            }));
+        }
+
         public static IFlow<TResult> Select<TSource, TResult>(this IFlow<TSource> source, Func<TSource, IFlow<TResult>> execute)
         {
             return new StateMachineFlow<TResult>(source.Scope, source.Observable.Select(s => execute(s).Observable).Concat());
