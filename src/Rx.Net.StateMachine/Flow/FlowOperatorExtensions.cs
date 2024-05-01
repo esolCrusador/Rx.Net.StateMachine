@@ -192,5 +192,19 @@ namespace Rx.Net.StateMachine.Flow
         {
             return source.Select(s => result);
         }
+
+        public static IFlow<TElement> TapException<TElement>(this IFlow<TElement> source, Action<Exception> tap) =>
+            TapException(source, (ex, scope) => tap(ex));
+
+        public static IFlow<TElement> TapException<TElement>(this IFlow<TElement> source, Action<Exception, StateMachineScope> tap)
+        {
+            IObservable<TElement> cought = source.Observable.Catch<TElement, Exception>(ex =>
+            {
+                tap(ex, source.Scope);
+                return Observable.Throw<TElement>(ex);
+            });
+
+            return new StateMachineFlow<TElement>(source.Scope, cought);
+        }
     }
 }

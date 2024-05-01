@@ -112,6 +112,7 @@ namespace Rx.Net.StateMachine
             bool isFinished = default;
             int initialStepsCount = sessionState.Counter;
 
+            Exception? exception = null;
             try
             {
                 isFinished = await workflow.Observable.Select(result => true)
@@ -130,6 +131,7 @@ namespace Rx.Net.StateMachine
             catch (Exception ex) when (_workflowFatalExceptions.IsFatal(ex))
             {
                 sessionState.Status = SessionStateStatus.Failed;
+                exception = ex;
                 sessionState.Result = ex.ToString();
                 _logger.LogError(ex, "Session {SessionId} {WorkflowId} failed", sessionState.SessionStateId, sessionState.WorkflowId);
             }
@@ -149,7 +151,8 @@ namespace Rx.Net.StateMachine
                 sessionState.SessionStateId,
                 status,
                 sessionState.Counter - initialStepsCount,
-                sessionState.Context
+                sessionState.Context,
+                exception
             );
         }
     }
