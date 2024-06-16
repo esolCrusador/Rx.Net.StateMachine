@@ -171,7 +171,13 @@ namespace Rx.Net.StateMachine.Persistance
             }
 
             await using var uof = _uofFactory.Create();
-            var session = await uof.GetSessionState(sessionId, cancellationToken) ?? throw new ArgumentException($"Could not find session {sessionId}");
+            var session = await uof.GetSessionState(sessionId, cancellationToken);
+            if (session == null)
+            {
+                _logger.LogWarning($"Could not find session {sessionId}");
+                return;
+            }
+
             if (session.Entity.Status == SessionStateStatus.Completed)
                 return;
 
@@ -232,9 +238,9 @@ namespace Rx.Net.StateMachine.Persistance
 
                 var sessionStates = await uof.GetSessionStates(events, cancellationToken);
 
-                _logger.LogInformation("Found {0} for events {EventTypes}\r\n{Events}", 
-                    sessionStates.Select(s => s.Entity.SessionStateId), 
-                    string.Join(", ", events.Select(ev => ev.GetType().FullName)), 
+                _logger.LogInformation("Found {0} for events {EventTypes}\r\n{Events}",
+                    sessionStates.Select(s => s.Entity.SessionStateId),
+                    string.Join(", ", events.Select(ev => ev.GetType().FullName)),
                     JsonSerializer.Serialize(events, _jsonSerializerOptions)
                 );
 
