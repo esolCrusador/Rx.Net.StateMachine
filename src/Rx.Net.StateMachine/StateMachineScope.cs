@@ -123,6 +123,11 @@ namespace Rx.Net.StateMachine
             return SessionState.GetItem<TItem>(AddPrefix(itemId), StateMachine.SerializerOptions);
         }
 
+        public TItem? GetItemOrDefault<TItem>(string itemId, TItem? defaultItem = default)
+        {
+            return SessionState.GetItemOrDefault<TItem>(AddPrefix(itemId), StateMachine.SerializerOptions, defaultItem);
+        }
+
         public TItem? GetGlobalItemOrDefault<TItem>(string itemId, TItem? defaultItem = default)
         {
             return SessionState.GetItemOrDefault<TItem>($"Global.{itemId}", StateMachine.SerializerOptions, defaultItem);
