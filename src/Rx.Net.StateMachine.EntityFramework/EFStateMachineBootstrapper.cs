@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Rx.Net.StateMachine.EntityFramework.Awaiters;
 using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.EntityFramework.Tables;
@@ -50,6 +51,14 @@ namespace Rx.Net.StateMachine.EntityFramework
             public ContextBuilder(IServiceCollection services)
             {
                 _services = services;
+            }
+
+            public ContextBuilder WithConfiguration(Action<IServiceProvider, StateMachineConfiguration> configure)
+            {
+                _services.AddOptions<StateMachineConfiguration>();
+                _services.AddSingleton<IConfigureOptions<StateMachineConfiguration>>(sp => new ConfigureNamedOptions<StateMachineConfiguration>(Options.DefaultName, opts => configure(sp, opts)));
+
+                return this;
             }
 
             public UserContextBuilder<TContext> WithContext<TContext>()
