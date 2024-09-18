@@ -10,6 +10,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine
@@ -20,14 +21,16 @@ namespace Rx.Net.StateMachine
         public StateMachine StateMachine { get; }
         public SessionState SessionState { get; }
         public ISessionStateStorage SessionStateStorage { get; }
-        public readonly Guid SessionId => SessionState.SessionStateId.GetValue("SessionStateId");
+        public CancellationToken CancellationToken { get; }
+        public readonly Guid SessionId => SessionState.SessionStateId ?? throw new ArgumentException($"{nameof(SessionState)}.{nameof(SessionState.SessionStateId)} was not initialized");
         public readonly int Version => SessionState.Version;
 
-        public StateMachineScope(StateMachine stateMachine, SessionState sessionState, ISessionStateStorage sessionStateRepository, string? prefix = null)
+        public StateMachineScope(StateMachine stateMachine, SessionState sessionState, ISessionStateStorage sessionStateRepository, CancellationToken cancellationToken, string? prefix = null)
         {
             StateMachine = stateMachine;
             SessionState = sessionState;
             SessionStateStorage = sessionStateRepository;
+            CancellationToken = cancellationToken;
             StatePrefix = prefix;
         }
 
@@ -35,10 +38,10 @@ namespace Rx.Net.StateMachine
             SessionState.TryGetStep(AddPrefix(stateId), StateMachine.SerializerOptions, out stepValue);
 
         public StateMachineScope BeginScope(string prefix) =>
-            new StateMachineScope(StateMachine, SessionState, SessionStateStorage, AddPrefix(prefix));
+            new StateMachineScope(StateMachine, SessionState, SessionStateStorage, CancellationToken, AddPrefix(prefix));
 
         public StateMachineScope EndScope(string prefix) =>
-            new StateMachineScope(StateMachine, SessionState, SessionStateStorage, RemovePrefix(prefix));
+            new StateMachineScope(StateMachine, SessionState, SessionStateStorage, CancellationToken, RemovePrefix(prefix));
 
         public async Task<StateMachineScope> BeginRecursiveScope(string prefix)
         {
@@ -51,7 +54,7 @@ namespace Rx.Net.StateMachine
                 await SessionStateStorage.PersistItemState(SessionState);
             }
 
-            return new StateMachineScope(StateMachine, SessionState, SessionStateStorage, AddPrefix(prefix));
+            return new StateMachineScope(StateMachine, SessionState, SessionStateStorage, CancellationToken, AddPrefix(prefix));
         }
 
         public async Task<StateMachineScope> IncreaseRecursionDepth()
@@ -104,9 +107,23 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
+        public Task UpdateGlobalItem<TItem>(string itemId, Func<TItem?, TItem> updateItem)
+        {
+            SessionState.UpdateItem($"Global.{itemId}", updateItem, StateMachine.SerializerOptions);
+
+            return SessionStateStorage.PersistItemState(SessionState);
+        }
+
         public Task AddOrUpdateGlobalItem<TItem>(string itemId, Func<TItem> getItemToAdd, Action<TItem> updateItem)
         {
             SessionState.AddOrUpdateItem($"Global.{itemId}", getItemToAdd, updateItem, StateMachine.SerializerOptions);
+
+            return SessionStateStorage.PersistItemState(SessionState);
+        }
+
+        public Task AddOrUpdateGlobalItem<TItem>(string itemId, TItem item)
+        {
+            SessionState.UpdateItem($"Global.{itemId}", item, StateMachine.SerializerOptions);
 
             return SessionStateStorage.PersistItemState(SessionState);
         }

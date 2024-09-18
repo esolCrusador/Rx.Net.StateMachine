@@ -158,7 +158,7 @@ namespace Rx.Net.StateMachine.EntityFramework
                 }
 
                 public EventHandlerRegistrationBuilder<TEvent> WithAwaiter<TAwaiterId>()
-                    where TAwaiterId : IEventAwaiter
+                    where TAwaiterId : IEventAwaiter<TEvent>
                 {
                     var awaiterIdType = typeof(TAwaiterId);
                     if (awaiterIdType.GetConstructor(new[] { typeof(TEvent) }) == null && awaiterIdType.GetConstructor(new Type[0]) == null)

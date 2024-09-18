@@ -11,6 +11,7 @@ using Rx.Net.StateMachine.States;
 using System;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.EntityFramework.UnitOfWork
@@ -41,19 +42,19 @@ namespace Rx.Net.StateMachine.EntityFramework.UnitOfWork
             _row = row;
         }
 
-        public async Task Save()
+        public async Task Save(CancellationToken cancellationToken)
         {
             if (_dbContext != null)
-                await Save(_dbContext);
+                await Save(_dbContext, cancellationToken);
             else
             {
-                await using var dbContext = _dbContextFactory.GetValue(nameof(_dbContextFactory)).CreateBase();
+                await using var dbContext = (_dbContextFactory ?? throw new ArgumentException($"{nameof(_dbContextFactory)} was not initialized")).CreateBase();
 
-                await Save(dbContext);
+                await Save(dbContext, cancellationToken);
             }
         }
 
-        private async Task Save(DbContext dbContext)
+        private async Task Save(DbContext dbContext, CancellationToken cancellationToken)
         {
             if (dbContext.Entry(_row)?.State != EntityState.Added)
                 dbContext.Set<SessionStateTable<TContext, TContextKey>>().Attach(_row);
@@ -66,7 +67,7 @@ namespace Rx.Net.StateMachine.EntityFramework.UnitOfWork
 
             try
             {
-                await dbContext.SaveChangesAsync();
+                await dbContext.SaveChangesAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException ex)
             {
