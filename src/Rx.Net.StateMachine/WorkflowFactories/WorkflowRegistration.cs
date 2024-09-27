@@ -13,7 +13,8 @@ namespace Rx.Net.StateMachine.WorkflowFactories
         {
             return new WorkflowRegistration
             {
-                Id = workflowId ?? (string)workflowType.GetField("Id", BindingFlags.Static | BindingFlags.Public | BindingFlags.FlattenHierarchy)!.GetRawConstantValue().GetValue("Id"),
+                Id = workflowId ?? (string?)workflowType.GetField("Id", BindingFlags.Static | BindingFlags.Public | BindingFlags.FlattenHierarchy)!.GetRawConstantValue()
+                    ?? throw new ArgumentException($"Id was not initialized"),
                 Type = workflowType
             };
         }

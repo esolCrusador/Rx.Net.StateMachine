@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine
@@ -50,41 +51,34 @@ namespace Rx.Net.StateMachine
             sessionState.ForceAddEvent(@event);
         }
 
-        public Task<HandlingResult> StartHandleWorkflow(object context, IWorkflow workflowFactory)
+        public Task<HandlingResult> HandleWorkflow(SessionState sessionState, IWorkflow workflowFactory, CancellationToken cancellationToken)
         {
-            var sessionState = new SessionState(workflowFactory.WorkflowId, context);
-
-            return HandleWorkflow(sessionState, workflowFactory);
+            return HandleWorkflow(sessionState, SessionStateStorage.Empty, workflowFactory, cancellationToken);
         }
 
-        public Task<HandlingResult> HandleWorkflow(SessionState sessionState, IWorkflow workflowFactory)
+        public Task<HandlingResult> HandleWorkflow(SessionState sessionState, ISessionStateStorage storage, IWorkflow workflowFactory, CancellationToken cancellationToken)
         {
-            return HandleWorkflow(sessionState, SessionStateStorage.Empty, workflowFactory);
-        }
-
-        public Task<HandlingResult> HandleWorkflow(SessionState sessionState, ISessionStateStorage storage, IWorkflow workflowFactory)
-        {
-            var workflow = workflowFactory.Execute(new StateMachineScope(this, sessionState, storage).StartFlow());
+            var workflow = workflowFactory.Execute(new StateMachineScope(this, sessionState, storage, cancellationToken).StartFlow());
 
             return HandleWorkflowResult(workflow, sessionState, storage);
         }
 
-        public Task<HandlingResult> StartHandleWorkflow<TSource>(TSource source, object context, IWorkflow<TSource> workflowFactory)
+        public Task<HandlingResult> StartHandleWorkflow<TSource>(TSource source, object context, IWorkflow<TSource> workflowFactory, CancellationToken cancellationToken)
         {
-            return StartHandleWorkflow(source, context, SessionStateStorage.Empty, workflowFactory);
+            return StartHandleWorkflow(source, context, SessionStateStorage.Empty, workflowFactory, cancellationToken);
         }
 
-        public Task<HandlingResult> StartHandleWorkflow<TSource>(TSource source, object context, ISessionStateStorage storage, IWorkflow<TSource> workflowFactory)
+        public Task<HandlingResult> StartHandleWorkflow<TSource>(TSource source, object context, ISessionStateStorage storage, IWorkflow<TSource> workflowFactory, CancellationToken cancellationToken)
         {
             var sessionState = new SessionState(workflowFactory.WorkflowId, context);
-            var workflow = workflowFactory.Execute(new StateMachineScope(this, sessionState, storage).StartFlow(source));
+            var workflow = workflowFactory.Execute(new StateMachineScope(this, sessionState, storage, cancellationToken).StartFlow(source));
 
             return HandleWorkflowResult(workflow, sessionState, storage);
         }
 
-        public Task<HandlingResult> StartHandleWorkflow<TSource>(TSource source, SessionState sessionState, ISessionStateStorage storage, IWorkflow<TSource> workflowFactory)
+        public Task<HandlingResult> StartHandleWorkflow<TSource>(TSource source, SessionState sessionState, ISessionStateStorage storage, IWorkflow<TSource> workflowFactory, CancellationToken cancellationToken)
         {
-            var workflow = workflowFactory.Execute(new StateMachineScope(this, sessionState, storage).StartFlow(source));
+            var workflow = workflowFactory.Execute(new StateMachineScope(this, sessionState, storage, cancellationToken).StartFlow(source));
 
             return HandleWorkflowResult(workflow, sessionState, storage);
         }
@@ -117,7 +111,7 @@ namespace Rx.Net.StateMachine
             {
                 isFinished = await workflow.Observable.Select(result => true)
                     .DefaultIfEmpty(false)
-                    .ToTask();
+                    .ToTask(workflow.Scope.CancellationToken);
 
 
                 if (isFinished == false)

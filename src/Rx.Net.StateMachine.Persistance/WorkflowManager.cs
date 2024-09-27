@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Polly;
 using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Persistance.Entities;
@@ -19,28 +20,31 @@ namespace Rx.Net.StateMachine.Persistance
     public class WorkflowManager<TContext>
         where TContext : class
     {
+        private static readonly HandlingResult[] EmptyHandlingResult = [];
         private readonly AsyncPolicy _concurrencyRetry;
         private readonly ILogger<WorkflowManager<TContext>> _logger;
         private readonly ISessionStateUnitOfWorkFactory _uofFactory;
         private readonly IWorkflowResolver _workflowResolver;
         private readonly IEventAwaiterResolver _eventAwaiterResolver;
+        private readonly IOptions<StateMachineConfiguration> _configuration;
         private readonly JsonSerializerOptions _jsonSerializerOptions;
 
         public StateMachine StateMachine { get; }
 
-        public WorkflowManager(ILogger<WorkflowManager<TContext>> logger, ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, IEventAwaiterResolver eventAwaiterResolver, StateMachine stateMachine, JsonSerializerOptions jsonSerializerOptions)
+        public WorkflowManager(ILogger<WorkflowManager<TContext>> logger, ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, IEventAwaiterResolver eventAwaiterResolver, StateMachine stateMachine, IOptions<StateMachineConfiguration> configuration, JsonSerializerOptions jsonSerializerOptions)
         {
             _logger = logger;
             _uofFactory = uofFactory;
             _workflowResolver = workflowResolver;
             _eventAwaiterResolver = eventAwaiterResolver;
             StateMachine = stateMachine;
+            _configuration = configuration;
             _jsonSerializerOptions = jsonSerializerOptions;
             _concurrencyRetry = Policy.Handle<ConcurrencyException>().RetryForeverAsync(ex => _logger.LogWarning(ex.Message));
         }
 
-        public WorkflowManager(ILogger<WorkflowManager<TContext>> logger, ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, IEventAwaiterResolver eventAwaiterResolver, StateMachine stateMachine)
-            : this(logger, uofFactory, workflowResolver, eventAwaiterResolver, stateMachine, new JsonSerializerOptions())
+        public WorkflowManager(ILogger<WorkflowManager<TContext>> logger, ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, IEventAwaiterResolver eventAwaiterResolver, StateMachine stateMachine, IOptions<StateMachineConfiguration> configuration)
+            : this(logger, uofFactory, workflowResolver, eventAwaiterResolver, stateMachine, configuration, new JsonSerializerOptions())
         {
         }
 
@@ -62,23 +66,23 @@ namespace Rx.Net.StateMachine.Persistance
                 _beforePersistScope = beforePersistScope;
                 return this;
             }
-            public async Task<HandlingResult> Workflow<TWorkflow>() where TWorkflow : class, IWorkflow
+            public async Task<HandlingResult> Workflow<TWorkflow>(CancellationToken cancellationToken) where TWorkflow : class, IWorkflow
             {
                 await using var workflowSession = _workflowResolver.GetWorkflowSession<TWorkflow>(_beforePersistScope, _context);
-                return await _workflowManager.StartHandle(workflowSession, _context);
+                return await _workflowManager.StartHandle(workflowSession, _context, cancellationToken);
             }
 
-            public async Task<HandlingResult> Workflow(string workflowId)
+            public async Task<HandlingResult> Workflow(string workflowId, CancellationToken cancellationToken)
             {
                 await using var workflowSession = _workflowResolver.GetWorkflowSession(workflowId, _beforePersistScope, _context);
-                return await _workflowManager.StartHandle(workflowSession, _context);
+                return await _workflowManager.StartHandle(workflowSession, _context, cancellationToken);
             }
         }
 
         public WorkflowRunner Start(TContext context) =>
             new WorkflowRunner(this, _workflowResolver, context);
 
-        private async Task<HandlingResult> StartHandle(WorkflowSession workflowSession, TContext context)
+        private async Task<HandlingResult> StartHandle(WorkflowSession workflowSession, TContext context, CancellationToken cancellationToken)
         {
             if (context == null)
                 throw new ArgumentNullException("context");
@@ -87,7 +91,7 @@ namespace Rx.Net.StateMachine.Persistance
             var sessionStateMemento = CreateNewSessionState(workflowSession.Workflow.WorkflowId, uof, context);
             var sessionState = ToSessionState(sessionStateMemento.Entity);
 
-            return await HandleSessionState(sessionState, workflowSession, sessionStateMemento);
+            return await HandleSessionState(sessionState, workflowSession, sessionStateMemento, cancellationToken);
         }
 
         public struct WorkflowRunner<TSource>
@@ -112,23 +116,23 @@ namespace Rx.Net.StateMachine.Persistance
                 return this;
             }
 
-            public async Task<HandlingResult> Workflow<TWorkflow>() where TWorkflow : class, IWorkflow<TSource>
+            public async Task<HandlingResult> Workflow<TWorkflow>(CancellationToken cancellationToken) where TWorkflow : class, IWorkflow<TSource>
             {
                 await using var workflowSession = _workflowResolver.GetWorkflowSession<TWorkflow>(_beforePersistScope, _context);
-                return await _workflowManager.StartHandle(_source, workflowSession, _context);
+                return await _workflowManager.StartHandle(_source, workflowSession, _context, cancellationToken);
             }
 
-            public async Task<HandlingResult> Workflow(string workflowId)
+            public async Task<HandlingResult> Workflow(string workflowId, CancellationToken cancellationToken)
             {
                 await using var workflowSession = _workflowResolver.GetWorkflowSession(workflowId, _beforePersistScope, _context);
-                return await _workflowManager.StartHandle(_source, workflowSession, _context);
+                return await _workflowManager.StartHandle(_source, workflowSession, _context, cancellationToken);
             }
         }
 
         public WorkflowRunner<TSource> Start<TSource>(TContext context, TSource source) =>
             new WorkflowRunner<TSource>(this, _workflowResolver, context, source);
 
-        private async Task<HandlingResult> StartHandle<TSource>(TSource source, WorkflowSession workflowSession, TContext context)
+        private async Task<HandlingResult> StartHandle<TSource>(TSource source, WorkflowSession workflowSession, TContext context, CancellationToken cancellationToken)
         {
             if (context == null)
                 throw new ArgumentNullException("context");
@@ -137,7 +141,7 @@ namespace Rx.Net.StateMachine.Persistance
             var sessionStateMemento = CreateNewSessionState(workflowSession.Workflow.WorkflowId, uof, context);
             var sessionState = ToSessionState(sessionStateMemento.Entity);
 
-            return await StartHandleSessionState<TSource>(source, sessionStateMemento.Entity, sessionState, workflowSession, sessionStateMemento);
+            return await StartHandleSessionState<TSource>(source, sessionStateMemento.Entity, sessionState, workflowSession, sessionStateMemento, cancellationToken);
         }
 
         public async Task RemoveDefaultSesssions(Guid? newDefaultSessionId, string userContextId, CancellationToken cancellationToken)
@@ -148,7 +152,7 @@ namespace Rx.Net.StateMachine.Persistance
         public async Task CancelSession(Guid sessionId, CancellationReason reason, CancellationToken cancellationToken)
         {
             Exception? exception = null;
-            List<HandlingResult>? result = null;
+            IReadOnlyList<HandlingResult>? result = null;
             try
             {
                 await HandleEvent(new BeforeSessionCancelled(sessionId, reason), null, cancellationToken);
@@ -193,7 +197,7 @@ namespace Rx.Net.StateMachine.Persistance
                 session.Entity.Result = exception.ToString();
             }
 
-            await session.Save();
+            await session.Save(cancellationToken);
         }
 
         public async Task<SessionStateStatus?> GetStatus(Guid sessionId, CancellationToken cancellationToken)
@@ -204,7 +208,7 @@ namespace Rx.Net.StateMachine.Persistance
             return memento?.Entity.Status;
         }
 
-        public Task<List<HandlingResult>> HandleEvent<TEvent>(TEvent @event, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<HandlingResult>> HandleEvent<TEvent>(TEvent @event, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
             where TEvent : class
         {
             if (@event == null)
@@ -220,14 +224,11 @@ namespace Rx.Net.StateMachine.Persistance
 
                 if (sessionStates.Count == 0)
                     return new List<HandlingResult>();
-
-                var handlers = sessionStates.Select(ss => HandleSessionStateEvent(@event, ss, beforePersist));
-
-                return await HandleExceptions(handlers);
+                return await HandleSessionStates(sessionStates, (sessionState, ccl) => HandleSessionStateEvent(@event, sessionState, beforePersist, ccl), cancellation);
             }, cancellationToken);
         }
 
-        public Task<List<HandlingResult>> HandleEvents(IReadOnlyCollection<object> events, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<HandlingResult>> HandleEvents(IReadOnlyCollection<object> events, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
         {
             if (events.Count == 0)
                 throw new ArgumentException(nameof(events));
@@ -247,15 +248,29 @@ namespace Rx.Net.StateMachine.Persistance
                 if (sessionStates.Count == 0)
                     return new List<HandlingResult>();
 
-                var handlers = sessionStates.Select(ss => HandleSessionStateEvents(events, ss, beforePersist));
-
-                return await HandleExceptions(handlers);
+                return await HandleSessionStates(sessionStates, (sessionState, ccl) => HandleSessionStateEvents(events, sessionState, beforePersist, ccl), cancellation);
             }, cancellationToken);
         }
 
-        private async Task<List<HandlingResult>> HandleExceptions(IEnumerable<Task<HandlingResult>> handlers)
+        private async Task<IReadOnlyList<HandlingResult>> HandleSessionStates(
+            IReadOnlyCollection<ISessionStateMemento> sessionStates,
+            Func<ISessionStateMemento, CancellationToken, Task<HandlingResult>> handle,
+            CancellationToken cancellationToken
+        )
         {
-            var results = await Task.WhenAll(handlers.Select(r => r.ResultOrException()));
+            if (sessionStates.Count == 0)
+                return EmptyHandlingResult;
+
+            List<HandlingResult> results = new List<HandlingResult>(sessionStates.Count);
+
+            await Parallel.ForEachAsync(sessionStates.Select((h, idx) => new KeyValuePair<int, ISessionStateMemento>(idx, h)), new ParallelOptions
+            {
+                CancellationToken = cancellationToken,
+                MaxDegreeOfParallelism = _configuration.Value.EventHandlingParallelism
+            }, async (kvp, cancellation) =>
+            {
+                results[kvp.Key] = await handle(kvp.Value, cancellation);
+            });
 
             var exceptions = results.Where(r => r.Exception != null).Select(r => r.Exception!).ToList();
 
@@ -272,7 +287,7 @@ namespace Rx.Net.StateMachine.Persistance
                 throw new AggregateException("Multiple tasks failed", exceptions);
             }
 
-            return results.Select(r => r.Result!).ToList();
+            return results.Select(r => r!).ToList();
         }
 
         private ISessionStateMemento CreateNewSessionState(string workflowId, ISessionStateUnitOfWork uof, TContext context)
@@ -293,7 +308,7 @@ namespace Rx.Net.StateMachine.Persistance
             return uof.Add(sessionState);
         }
 
-        private async Task<HandlingResult> HandleSessionStateEvent<TEvent>(TEvent @event, ISessionStateMemento sessionStateMemento, BeforePersistScope? beforePersist)
+        private async Task<HandlingResult> HandleSessionStateEvent<TEvent>(TEvent @event, ISessionStateMemento sessionStateMemento, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
             where TEvent : class
         {
             var sessionStateEntity = sessionStateMemento.Entity;
@@ -305,10 +320,10 @@ namespace Rx.Net.StateMachine.Persistance
             if (!isAdded)
                 return HandlingResult.Ignored(sessionStateEntity.SessionStateId, sessionState.Context);
 
-            return await HandleSessionState(sessionState, sessionStateMemento, beforePersist);
+            return await HandleSessionState(sessionState, sessionStateMemento, beforePersist, cancellationToken);
         }
 
-        private async Task<HandlingResult> HandleSessionStateEvents(IEnumerable<object> events, ISessionStateMemento sessionStateMemento, BeforePersistScope? beforePersist)
+        private async Task<HandlingResult> HandleSessionStateEvents(IEnumerable<object> events, ISessionStateMemento sessionStateMemento, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
         {
             SessionStateEntity sessionStateEntity = sessionStateMemento.Entity;
             var sessionState = ToSessionState(sessionStateEntity);
@@ -322,7 +337,7 @@ namespace Rx.Net.StateMachine.Persistance
             if (!isAdded)
                 return HandlingResult.Ignored(sessionStateEntity.SessionStateId, sessionState.Context);
 
-            return await HandleSessionState(sessionState, sessionStateMemento, beforePersist);
+            return await HandleSessionState(sessionState, sessionStateMemento, beforePersist, cancellationToken);
         }
 
         private void CheckStaleVersion(object @event, SessionState sessionState)
@@ -341,36 +356,36 @@ namespace Rx.Net.StateMachine.Persistance
                 CheckStaleVersion(@event, sessionState);
         }
 
-        private async Task<HandlingResult> HandleSessionState(SessionState sessionState, ISessionStateMemento sessionStateMemento, BeforePersistScope? beforePersist)
+        private async Task<HandlingResult> HandleSessionState(SessionState sessionState, ISessionStateMemento sessionStateMemento, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
         {
             await using var workflowSession = _workflowResolver.GetWorkflowSession(sessionState.WorkflowId, beforePersist, sessionState.Context);
-            return await HandleSessionState(sessionState, workflowSession, sessionStateMemento);
+            return await HandleSessionState(sessionState, workflowSession, sessionStateMemento, cancellationToken);
         }
 
-        private async Task<HandlingResult> HandleSessionState(SessionState sessionState, WorkflowSession workflowSession, ISessionStateMemento sessionStateMemento)
+        private async Task<HandlingResult> HandleSessionState(SessionState sessionState, WorkflowSession workflowSession, ISessionStateMemento sessionStateMemento, CancellationToken cancellationToken)
         {
             var storage = new SessionStateStorage(PersistStrategy.Default, async st =>
             {
                 await workflowSession.BeforePersist(st);
                 UpdateSessionStateEntity(st, sessionStateMemento.Entity);
                 _logger.LogInformation($"Saving changes for {sessionState.SessionStateId}");
-                await sessionStateMemento.Save();
+                await sessionStateMemento.Save(cancellationToken);
             });
 
-            return await StateMachine.HandleWorkflow(sessionState, storage, workflowSession.Workflow);
+            return await StateMachine.HandleWorkflow(sessionState, storage, workflowSession.Workflow, cancellationToken);
         }
 
-        private async Task<HandlingResult> StartHandleSessionState<TSource>(TSource source, SessionStateEntity sessionStateEntity, SessionState sessionState, WorkflowSession workflowSession, ISessionStateMemento sessionStateMemento)
+        private async Task<HandlingResult> StartHandleSessionState<TSource>(TSource source, SessionStateEntity sessionStateEntity, SessionState sessionState, WorkflowSession workflowSession, ISessionStateMemento sessionStateMemento, CancellationToken cancellationToken)
         {
             var storage = new SessionStateStorage(PersistStrategy.Default, async st =>
             {
                 await workflowSession.BeforePersist(st);
                 UpdateSessionStateEntity(st, sessionStateEntity);
                 _logger.LogInformation($"Saving changes for {sessionState.SessionStateId}");
-                await sessionStateMemento.Save();
+                await sessionStateMemento.Save(cancellationToken);
             });
 
-            return await StateMachine.StartHandleWorkflow(source, sessionState, storage, (IWorkflow<TSource>)workflowSession.Workflow);
+            return await StateMachine.StartHandleWorkflow(source, sessionState, storage, (IWorkflow<TSource>)workflowSession.Workflow, cancellationToken);
         }
 
         private static SessionState ToSessionState(SessionStateEntity entity)
