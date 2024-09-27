@@ -48,16 +48,16 @@ namespace Rx.Net.StateMachine.Extensions
             return scope.DeleteItem(collectionName);
         }
 
-        public static IFlow<TSource> DisposeItems<TSource, TItemId>(this IFlow<TSource> source, Func<IEnumerable<TItemId>, Task> disposeItems, string collectionName = "Messages")
+        public static IFlow<TSource> DisposeItems<TSource, TItemId>(this IFlow<TSource> source, Func<IEnumerable<TItemId>, StateMachineScope, Task> disposeItems, string collectionName = "Messages")
         {
-            return source.FinallyAsync(async (isExecuted, s, ex) =>
+            return source.FinallyAsync(async (isExecuted, s, ex, scope) =>
             {
                 if (!isExecuted)
                     return;
 
                 var allMessages = source.Scope.GetItems<List<TItemId>>(collectionName);
 
-                await disposeItems(allMessages.SelectMany(messages => messages));
+                await disposeItems(allMessages.SelectMany(messages => messages), scope);
             });
         }
     }

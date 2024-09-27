@@ -147,7 +147,7 @@ namespace Rx.Net.StateMachine.Flow
             }));
         }
 
-        public delegate Task FinallyDelegate<TSource>(bool isExecuted, TSource? source, Exception? ex);
+        public delegate Task FinallyDelegate<TSource>(bool isExecuted, TSource? source, Exception? ex, StateMachineScope scope);
 
         public static IFlow<TSource> FinallyAsync<TSource>(this IFlow<TSource> flow, FinallyDelegate<TSource> handle)
         {
@@ -165,19 +165,19 @@ namespace Rx.Net.StateMachine.Flow
                     },
                     ex =>
                     {
-                        handle(true, lastSource, ex).ContinueWith(_ => observer.OnError(ex));
+                        handle(true, lastSource, ex, flow.Scope).ContinueWith(_ => observer.OnError(ex));
                         isFinalized = true;
                     },
                     () =>
                     {
-                        handle(isExecuted, lastSource, null).ContinueWith(_ => observer.OnCompleted());
+                        handle(isExecuted, lastSource, null, flow.Scope).ContinueWith(_ => observer.OnCompleted());
                         isFinalized = true;
                     });
 
                 return () =>
                 {
                     if (!isFinalized)
-                        handle(isExecuted, lastSource, null);
+                        handle(isExecuted, lastSource, null, flow.Scope);
                     subscrption.Dispose();
                 };
             }));
