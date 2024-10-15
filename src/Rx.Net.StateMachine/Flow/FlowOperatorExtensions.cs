@@ -206,5 +206,8 @@ namespace Rx.Net.StateMachine.Flow
 
             return new StateMachineFlow<TElement>(source.Scope, cought);
         }
+
+        public static IFlow<TResult> Pipe<TElement, TResult>(this IFlow<TElement> source, Func<IFlow<TElement>, IFlow<TResult>> execute) =>
+            execute(source);
     }
 }
