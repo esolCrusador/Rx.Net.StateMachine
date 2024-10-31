@@ -12,7 +12,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.Tables
     {
         [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)] public Guid AwaiterId { get; set; }
         public Guid SessionStateId { get; set; }
-        [StringLength(128)] public string Name { get; set; }
+        [Column(TypeName = "varchar(5000)")] public string Name { get; set; }
         [StringLength(256), Column(TypeName = "varchar(256)")] public string Identifier { get; set; }
         public int SequenceNumber { get; set; }
         public bool IsActive { get; set; } = true;
