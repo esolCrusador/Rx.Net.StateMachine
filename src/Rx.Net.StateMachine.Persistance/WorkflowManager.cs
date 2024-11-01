@@ -261,7 +261,7 @@ namespace Rx.Net.StateMachine.Persistance
             if (sessionStates.Count == 0)
                 return EmptyHandlingResult;
 
-            List<HandlingResult> results = new List<HandlingResult>(sessionStates.Count);
+            HandlingResult[] results = new HandlingResult[sessionStates.Count];
 
             await Parallel.ForEachAsync(sessionStates.Select((h, idx) => new KeyValuePair<int, ISessionStateMemento>(idx, h)), new ParallelOptions
             {
