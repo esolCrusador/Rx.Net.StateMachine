@@ -261,7 +261,7 @@ namespace Rx.Net.StateMachine.Persistance
             if (sessionStates.Count == 0)
                 return EmptyHandlingResult;
 
-            HandlingResult[] results = new HandlingResult[sessionStates.Count];
+            ResultOrException<HandlingResult>[] results = new ResultOrException<HandlingResult>[sessionStates.Count];
 
             await Parallel.ForEachAsync(sessionStates.Select((h, idx) => new KeyValuePair<int, ISessionStateMemento>(idx, h)), new ParallelOptions
             {
@@ -269,7 +269,7 @@ namespace Rx.Net.StateMachine.Persistance
                 MaxDegreeOfParallelism = _configuration.Value.EventHandlingParallelism
             }, async (kvp, cancellation) =>
             {
-                results[kvp.Key] = await handle(kvp.Value, cancellation);
+                results[kvp.Key] = await handle(kvp.Value, cancellation).ResultOrException();
             });
 
             var exceptions = results.Where(r => r.Exception != null).Select(r => r.Exception!).ToList();
@@ -287,7 +287,7 @@ namespace Rx.Net.StateMachine.Persistance
                 throw new AggregateException("Multiple tasks failed", exceptions);
             }
 
-            return results.Select(r => r!).ToList();
+            return results.Select(r => r.Result!).ToList();
         }
 
         private ISessionStateMemento CreateNewSessionState(string workflowId, ISessionStateUnitOfWork uof, TContext context)
