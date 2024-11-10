@@ -87,6 +87,13 @@ namespace Rx.Net.StateMachine.Persistance
             if (context == null)
                 throw new ArgumentNullException("context");
 
+            if (!workflowSession.Workflow.IsPersistant)
+                return await StateMachine.StartHandleWorkflow(context,
+                    SessionStateStorage.NonePersistent(workflowSession.BeforePersist),
+                    workflowSession.Workflow,
+                    cancellationToken
+                );
+
             await using var uof = _uofFactory.Create();
             var sessionStateMemento = CreateNewSessionState(workflowSession.Workflow.WorkflowId, uof, context);
             var sessionState = ToSessionState(sessionStateMemento.Entity);
@@ -136,6 +143,13 @@ namespace Rx.Net.StateMachine.Persistance
         {
             if (context == null)
                 throw new ArgumentNullException("context");
+            if (!workflowSession.Workflow.IsPersistant)
+                return await StateMachine.StartHandleWorkflow<TSource>(
+                    source, context,
+                    SessionStateStorage.NonePersistent(workflowSession.BeforePersist),
+                    (IWorkflow<TSource>)workflowSession.Workflow,
+                    cancellationToken
+                );
 
             await using var uof = _uofFactory.Create();
             var sessionStateMemento = CreateNewSessionState(workflowSession.Workflow.WorkflowId, uof, context);
@@ -208,8 +222,24 @@ namespace Rx.Net.StateMachine.Persistance
             return memento?.Entity.Status;
         }
 
-        public Task<IReadOnlyList<HandlingResult>> HandleEvent<TEvent>(TEvent @event, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
+        public async Task<HandlingResult> HandleEventUnpersistant<TEvent>(TEvent @event, object userContext, string state, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
             where TEvent : class
+        {
+            if (@event == null)
+                throw new ArgumentNullException(nameof(@event));
+
+            var sessionState = StateMachine.ParseSessionState(userContext, state);
+            await using var workflowSession = _workflowResolver.GetWorkflowSession(sessionState.WorkflowId, beforePersist, userContext);
+            if (workflowSession.Workflow.IsPersistant)
+                throw new InvalidOperationException($"Can't handle upersistantly persistant workflow {sessionState.WorkflowId} : {workflowSession.Workflow.GetType().FullName}");
+
+            StateMachine.ForceAddEvent(sessionState, @event);
+
+            return await StateMachine.HandleWorkflow(sessionState, SessionStateStorage.NonePersistent(workflowSession.BeforePersist), workflowSession.Workflow, cancellationToken);
+        }
+
+        public Task<IReadOnlyList<HandlingResult>> HandleEvent<TEvent>(TEvent @event, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
+        where TEvent : class
         {
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
@@ -231,7 +261,7 @@ namespace Rx.Net.StateMachine.Persistance
         public Task<IReadOnlyList<HandlingResult>> HandleEvents(IReadOnlyCollection<object> events, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
         {
             if (events.Count == 0)
-                throw new ArgumentException(nameof(events));
+                throw new ArgumentException("Empty events", nameof(events));
 
             return _concurrencyRetry.ExecuteAsync(async cancellation =>
             {

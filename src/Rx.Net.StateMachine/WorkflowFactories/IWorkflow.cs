@@ -7,10 +7,11 @@ namespace Rx.Net.StateMachine.WorkflowFactories
     public interface IWorkflow
     {
         string WorkflowId { get; }
+        bool IsPersistant { get; }
         IFlow<Unit> Execute(IFlow<Unit> flow);
     }
 
-    public interface IWorkflow<TSource>: IWorkflow
+    public interface IWorkflow<TSource> : IWorkflow
     {
         IFlow<Unit> Execute(IFlow<TSource> flow);
     }
