@@ -23,20 +23,18 @@ namespace Rx.Net.StateMachine.Flow
             });
         }
 
-        public static IFlow<TElement?> PersistBeforePrevious<TElement>(this IFlow<TElement> flow, string stateId, TElement? defaultValue = default)
+        public static IFlow<TElement> ContinuePersisted<TElement>(this IFlow<TElement> flow, string stateId, TElement? defaultValue = default)
         {
             if (flow.Scope.TryGetStep<TElement>(stateId, out var stepValue))
-                return flow.Scope.StartFlow((TElement?)stepValue);
+                return flow.Scope.StartFlow(stepValue!);
 
-            var observable = Observable.FromAsync(async () =>
+            var observable = Observable.Create<TElement>(async observer =>
             {
-                await flow.Scope.AddStep(stateId, defaultValue);
                 await flow.Observable.ToTask();
-
-                return defaultValue;
+                observer.OnCompleted();
             });
 
-            return new StateMachineFlow<TElement?>(flow.Scope, observable);
+            return new StateMachineFlow<TElement>(flow.Scope, observable);
         }
 
         public static StopAndWaitFactory<TSource> StopAndWait<TSource>(this IFlow<TSource> source) =>

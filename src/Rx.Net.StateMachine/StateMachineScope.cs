@@ -1,13 +1,10 @@
 ﻿using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Exceptions;
-using Rx.Net.StateMachine.Extensions;
-using Rx.Net.StateMachine.Helpers;
 using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Storage;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -210,21 +207,7 @@ namespace Rx.Net.StateMachine
 
         public TContext GetContext<TContext>() => (TContext)SessionState.Context;
 
-        public string GetStateString()
-        {
-            using var stateStream = new MemoryStream();
-            var serializerOptions = new JsonSerializerOptions(StateMachine.SerializerOptions)
-            {
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull | JsonIgnoreCondition.WhenWritingDefault
-            };
-
-            JsonSerializer.Serialize(stateStream, SessionState.ToMinimalState(), StateMachine.SerializerOptions);
-
-            var zipped = CompressionHelper.Zip(stateStream);
-            Console.WriteLine("Initial Length: {0}, Zipped Length: {1}", stateStream.Length, zipped.Length);
-
-            return zipped;
-        }
+        public string GetStateString() => SessionState.ToMinimalState().GetStateString(StateMachine.SerializerOptions);
 
         private static string GetDepthName(string? prefix) => $"{prefix}[depth]";
 

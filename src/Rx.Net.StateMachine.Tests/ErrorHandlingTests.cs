@@ -387,7 +387,7 @@ namespace Rx.Net.StateMachine.Tests
             }
         }
 
-        class MessageHandledAwaiter : IEventAwaiter<MessageHandled>, IIgnoreSessionVersion
+        class MessageHandledAwaiter : IEventAwaiter<MessageHandled>
         {
             public string AwaiterId => $"{nameof(MessageHandled)}-{MessageId:n}";
 

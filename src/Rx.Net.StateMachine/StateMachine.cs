@@ -8,6 +8,7 @@ using Rx.Net.StateMachine.Storage;
 using Rx.Net.StateMachine.WorkflowFactories;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
 using System.Text.Json;
@@ -51,11 +52,6 @@ namespace Rx.Net.StateMachine
             sessionState.ForceAddEvent(@event);
         }
 
-        public Task<HandlingResult> HandleWorkflow(SessionState sessionState, IWorkflow workflowFactory, CancellationToken cancellationToken)
-        {
-            return HandleWorkflow(sessionState, SessionStateStorage.Empty, workflowFactory, cancellationToken);
-        }
-
         public Task<HandlingResult> HandleWorkflow(SessionState sessionState, ISessionStateStorage storage, IWorkflow workflowFactory, CancellationToken cancellationToken)
         {
             var workflow = workflowFactory.Execute(new StateMachineScope(this, sessionState, storage, cancellationToken).StartFlow());
@@ -63,9 +59,12 @@ namespace Rx.Net.StateMachine
             return HandleWorkflowResult(workflow, sessionState, storage);
         }
 
-        public Task<HandlingResult> StartHandleWorkflow<TSource>(TSource source, object context, IWorkflow<TSource> workflowFactory, CancellationToken cancellationToken)
+        public Task<HandlingResult> StartHandleWorkflow(object context, ISessionStateStorage storage, IWorkflow workflowFactory, CancellationToken cancellationToken)
         {
-            return StartHandleWorkflow(source, context, SessionStateStorage.Empty, workflowFactory, cancellationToken);
+            var sessionState = new SessionState(workflowFactory.WorkflowId, context);
+            var workflow = workflowFactory.Execute(new StateMachineScope(this, sessionState, storage, cancellationToken).StartFlow());
+
+            return HandleWorkflowResult(workflow, sessionState, storage);
         }
 
         public Task<HandlingResult> StartHandleWorkflow<TSource>(TSource source, object context, ISessionStateStorage storage, IWorkflow<TSource> workflowFactory, CancellationToken cancellationToken)
@@ -82,20 +81,20 @@ namespace Rx.Net.StateMachine
 
             return HandleWorkflowResult(workflow, sessionState, storage);
         }
-
+        
         public SessionState ParseSessionState(object context, string stateString)
         {
-            using var stateStream = CompressionHelper.Unzip(stateString);
-            var minimalSessionState = JsonSerializer.Deserialize<MinimalSessionState>(stateStream, SerializerOptions)!;
+            var minimalSessionState = MinimalSessionState.Parse(stateString, SerializerOptions)!;
 
             return new SessionState(
                 null,
                 minimalSessionState.WorkflowId,
                 context,
                 false,
-                minimalSessionState.Counter,
-                minimalSessionState.Steps ?? new Dictionary<string, SessionStateStep>(),
-                minimalSessionState.Items ?? new Dictionary<string, object?>(),
+                minimalSessionState.Steps?.Count ?? 0,
+                minimalSessionState.Steps?.Select((kvp, idx) => new { kvp.Key, kvp.Value, SequenceNumber = idx + 1 })
+                    .ToDictionary(v => v.Key, v => new SessionStateStep(v.Value, v.SequenceNumber)) ?? [],
+                minimalSessionState.Items ?? [],
                 new List<PastSessionEvent>(),
                 new List<SessionEventAwaiter>()
             );

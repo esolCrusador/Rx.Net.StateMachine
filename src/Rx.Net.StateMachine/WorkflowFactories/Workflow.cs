@@ -8,6 +8,7 @@ namespace Rx.Net.StateMachine.WorkflowFactories
     public abstract class Workflow : IWorkflow
     {
         public abstract string WorkflowId { get; }
+        public virtual bool IsPersistant => true;
 
         public abstract IFlow<Unit> Execute(IFlow<Unit> flow);
     }

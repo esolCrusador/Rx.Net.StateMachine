@@ -138,7 +138,7 @@ namespace Rx.Net.StateMachine.States
                 AddItem(itemId, createAction(), options);
         }
 
-        internal void AddOrUpdateItem<TItem>(string itemId, TItem item) => 
+        internal void AddOrUpdateItem<TItem>(string itemId, TItem item) =>
             _items[itemId] = item;
 
         internal bool TryGetItem<TItem>(string itemId, JsonSerializerOptions options, [MaybeNullWhen(false)] out TItem? item)
@@ -251,9 +251,8 @@ namespace Rx.Net.StateMachine.States
         internal MinimalSessionState ToMinimalState() => new MinimalSessionState
         {
             WorkflowId = WorkflowId,
-            Steps = _steps.Count == 0 ? null : _steps,
+            Steps = _steps.Count == 0 ? null : _steps.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.State),
             Items = _items.Count == 0 ? null : _items,
-            Counter = Counter
         };
 
         private int GetSequenceNumber() => ++Counter;

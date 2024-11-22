@@ -1,4 +1,5 @@
 ﻿using Rx.Net.StateMachine.States;
+using Rx.Net.StateMachine.WorkflowFactories;
 using System;
 using System.Threading.Tasks;
 
@@ -53,7 +54,6 @@ namespace Rx.Net.StateMachine.Storage
 
         private bool StrategyContains(PersistStrategy persistStrategy) =>
             (_persistStrategy & persistStrategy) == persistStrategy;
-
-        public static readonly SessionStateStorage Empty = new SessionStateStorage(PersistStrategy.Default, ss => Task.CompletedTask);
+        public static SessionStateStorage NonePersistent(BeforePersist beforePersist) => new(PersistStrategy.Default, ss => beforePersist(ss));
     }
 }
