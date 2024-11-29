@@ -99,6 +99,14 @@ namespace Rx.Net.StateMachine.Flow
             );
         }
 
+        public static IFlow<TSource> Where<TSource>(this IFlow<TSource> source, Func<TSource, bool> filter)
+        {
+            return new StateMachineFlow<TSource>(
+                source.Scope,
+                source.Observable.Where(filter)
+            );
+        }
+
         public static IFlow<IList<TResult>> WhenAll<TSource, TResult>(this IFlow<TSource> source, Func<TSource, StateMachineScope, IEnumerable<IFlow<TResult>>> flowsFactory)
         {
             return new StateMachineFlow<IList<TResult>>(source.Scope,

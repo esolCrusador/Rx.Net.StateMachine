@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace Rx.Net.StateMachine.States
 {
-    internal class MinimalSessionState
+    internal partial class MinimalSessionState
     {
         private static readonly Regex KeyCleanupRegexp = CreateKeyCleanupRegexp();
         private static readonly Regex KeyEnrichRegexp = CreateKeyEnrichRegexp();
