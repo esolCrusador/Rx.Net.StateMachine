@@ -198,12 +198,18 @@ namespace Rx.Net.StateMachine.States
         internal IEnumerable<TEvent> GetEvents<TEvent>(IEventAwaiter<TEvent> eventAwaiter, Func<TEvent, bool>? filter)
         {
             var result = _events.Where(es => es.Event is TEvent 
-                && es.Awaiters?.Any(aw => aw.Identifier == eventAwaiter.AwaiterId 
-                    && (
-                        eventAwaiter is not IEventAwaiterIgnore eventAwaiterIgnore
-                        || eventAwaiterIgnore.IgnoreIdentifier != aw.IgnoreIdentifier
-                       )
-                    ) != false)
+                && es.Awaiters?.Any(aw =>
+                {
+                    if (aw.Identifier != eventAwaiter.AwaiterId)
+                        return false;
+
+                    if (eventAwaiter is not IEventAwaiterIgnore)
+                        return true;
+
+                    var ignoreAwaiter = ((IEventAwaiterIgnore)AwaiterExtensions.CreateAwaiter(eventAwaiter.GetType(), es.Event));
+
+                    return ignoreAwaiter.IgnoreIdentifier != aw.IgnoreIdentifier;
+                }) != false)
                 .Select(es => (TEvent)es.Event);
 
             if (filter != null)
