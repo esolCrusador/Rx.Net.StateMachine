@@ -1,8 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Rx.Net.StateMachine.EntityFramework.Awaiters;
 using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
+using Rx.Net.StateMachine.EntityFramework.Extensions;
 using Rx.Net.StateMachine.EntityFramework.Tables;
+using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
 using Rx.Net.StateMachine.EntityFramework.UnitOfWork;
+using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Extensions;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Persistance.Entities;
@@ -92,7 +95,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             var filter = GetAwaitersFilter(awaitHandler, @event);
             var sessionId = GetSessionId(awaitHandler, @event);
             if (sessionId.HasValue)
-                filter = ExpressionExtensions.Aggregate(
+                filter = ExpressionExtensions.AggregateExpression(
                     (r1, r2) => r1 || r2,
                     s => s.SessionStateId == sessionId.Value,
                     filter
@@ -130,19 +133,19 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 if (sessionId.HasValue)
                 {
                     sessionIds.Add(sessionId.Value);
-                    filter = ExpressionExtensions.Aggregate(
+                    filter = ExpressionExtensions.AggregateExpression(
                         (r1, r2) => r1 || r2,
                         s => s.SessionStateId == sessionId.Value,
                         filter
                     );
                 }
 
-                return ExpressionExtensions.Aggregate(
+                return ExpressionExtensions.AggregateExpression(
                     (match1, match2) => match1 && match2,
                     filter,
                     awaitHandler.GetSessionStateFilter(ev)
                 );
-            }).ToList().Aggregate((match1, match2) => match1 || match2);
+            }).ToList().AggregateExpression((match1, match2) => match1 || match2);
 
             var sessions = await SessionStateDbContext.Set<SessionStateTable<TContext, TContextKey>>()
                 .Include(ss => ss.Context)
@@ -187,10 +190,41 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 
         private Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> GetAwaitersFilter(IAwaiterHandler<TContext, TContextKey> awaiterHandler, object @event)
         {
-            var awaiterIdentifiers = awaiterHandler.GetAwaiterIdTypes()
-                .Select(at => AwaiterExtensions.CreateAwaiter(at, @event).AwaiterId).ToList();
+            bool hasIgnoreAwaiter = false;
+            List<IEventAwaiter> awaiters = new List<IEventAwaiter>();
+            foreach (var at in awaiterHandler.GetAwaiterIdTypes())
+            {
+                var awaiter = AwaiterExtensions.CreateAwaiter(at, @event);
+                awaiters.Add(awaiter);
+                hasIgnoreAwaiter = hasIgnoreAwaiter || awaiter is IEventAwaiterIgnore;
+            }
 
-            return ss => ss.Awaiters.Any(aw => aw.IsActive && awaiterIdentifiers.Contains(aw.Identifier));
+            Expression<Func<SessionEventAwaiterTable<TContext, TContextKey>, bool>> filter;
+            if (hasIgnoreAwaiter)
+            {
+                filter = awaiters.Select(awaiter =>
+                {
+                    Expression<Func<SessionEventAwaiterTable<TContext, TContextKey>, bool>> awf;
+                    if (awaiter is IEventAwaiterIgnore eventAwaiterIgnore)
+                        awf = dbAwaiter => dbAwaiter.Identifier == awaiter.AwaiterId && dbAwaiter.IgnoreIdentifier != eventAwaiterIgnore.IgnoreIdentifier;
+                    else
+                        awf = aw => aw.Identifier == awaiter.AwaiterId;
+
+                    return awf;
+                }).ToList().AggregateExpression((ex1, ex2) => ex1 || ex2);
+
+                Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> result = ss => 
+                    ss.Awaiters.Where(aw => aw.IsActive).Any(aw => filter.Invoke(aw));
+
+                return result.ApplyExpressions();
+            }
+            else
+            {
+                var awaiterIdentifiers = awaiters.Select(aw => aw.AwaiterId).ToList();
+                filter = aw => aw.IsActive && awaiterIdentifiers.Contains(aw.Identifier);
+
+                return ss => ss.Awaiters.Any(aw => aw.IsActive && awaiterIdentifiers.Contains(aw.Identifier));
+            }
         }
 
         private Guid? GetSessionId(IAwaiterHandler<TContext, TContextKey> awaiterHandler, object @event) =>
@@ -228,6 +262,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 SequenceNumber = aw.SequenceNumber,
                 Name = aw.Name,
                 Identifier = aw.Identifier,
+                IgnoreIdentifier = aw.IgnoreIdentifier,
             }).ToList();
 
             dest.Status = source.Status;

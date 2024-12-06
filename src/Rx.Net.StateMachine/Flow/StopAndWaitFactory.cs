@@ -62,5 +62,20 @@ namespace Rx.Net.StateMachine.Flow
                 return scope.StopAndWait(eventStateId, awaiterId, e => filter(e, s));
             });
         }
+
+        /// <summary>
+        /// Waits for event and than persists it
+        /// </summary>
+        public IFlow<TEvent> For<TEvent>(string eventStateId, IEventAwaiter<TEvent> awaiterId, Func<TEvent, TSource, StateMachineScope, bool> filter)
+            where TEvent : class
+        {
+            if (filter == null)
+                throw new ArgumentNullException(nameof(filter));
+
+            return _source.Select((s, scope) =>
+            {
+                return scope.StopAndWait(eventStateId, awaiterId, e => filter(e, s, scope));
+            });
+        }
     }
 }

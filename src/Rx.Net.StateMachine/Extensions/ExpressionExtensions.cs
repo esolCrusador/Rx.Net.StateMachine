@@ -7,14 +7,14 @@ namespace Rx.Net.StateMachine.Extensions
 {
     public static class ExpressionExtensions
     {
-        public static Expression<Func<TSource, TResult>> Aggregate<TSource, TResult>(
+        public static Expression<Func<TSource, TResult>> AggregateExpression<TSource, TResult>(
             Expression<Func<TResult, TResult, TResult>> resultSelector,
             params Expression<Func<TSource, TResult>>[] expressions)
         {
-            return Aggregate(expressions, resultSelector);
+            return AggregateExpression(expressions, resultSelector);
         }
 
-        public static Expression<Func<TSource, TResult>> Aggregate<TSource, TResult>(
+        public static Expression<Func<TSource, TResult>> AggregateExpression<TSource, TResult>(
             this IReadOnlyList<Expression<Func<TSource, TResult>>> expressions,
             Expression<Func<TResult, TResult, TResult>> resultSelector)
         {

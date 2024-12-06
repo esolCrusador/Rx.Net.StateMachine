@@ -250,7 +250,10 @@ namespace Rx.Net.StateMachine.Persistance
 
                 var sessionStates = await uof.GetSessionStates(@event, cancellationToken);
 
-                _logger.LogInformation("Found {SessionIds} for event {EventType}\r\n{Event}", sessionStates.Select(s => s.Entity.SessionStateId), @event.GetType().FullName, JsonSerializer.Serialize(@event, _jsonSerializerOptions));
+                if (sessionStates.Any())
+                    _logger.LogInformation("Found {SessionIds} for event {EventType}\r\n{Event}", sessionStates.Select(s => s.Entity.SessionStateId), @event.GetType().FullName, JsonSerializer.Serialize(@event, _jsonSerializerOptions));
+                else
+                    _logger.LogInformation("Didn't find sessions for event {EventType}\r\n{Event}", @event.GetType().FullName, JsonSerializer.Serialize(@event, _jsonSerializerOptions));
 
                 if (sessionStates.Count == 0)
                     return new List<HandlingResult>();
@@ -429,7 +432,7 @@ namespace Rx.Net.StateMachine.Persistance
                 entity.Steps.ToDictionary(s => s.Id, s => new SessionStateStep(s.State, s.SequenceNumber)),
                 entity.Items.ToDictionary(i => i.Id, i => i.Value),
                 MapSessionEvents(entity.PastEvents),
-                entity.Awaiters.Select(aw => new SessionEventAwaiter(aw.AwaiterId, aw.Name, aw.Identifier, aw.SequenceNumber)).ToList()
+                entity.Awaiters.Select(aw => new SessionEventAwaiter(aw.AwaiterId, aw.Name, aw.Identifier, aw.IgnoreIdentifier, aw.SequenceNumber)).ToList()
             )
             {
                 Status = entity.Status,
@@ -459,6 +462,7 @@ namespace Rx.Net.StateMachine.Persistance
             {
                 Name = aw.Name,
                 Identifier = aw.Identifier,
+                IgnoreIdentifier = aw.IgnoreIdentifier,
                 SequenceNumber = aw.SequenceNumber
             }).ToList();
             dest.Counter = state.Counter;
