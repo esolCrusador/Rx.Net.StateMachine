@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reactive;
 using System.Text.Json;
 
 namespace Rx.Net.StateMachine.Extensions
@@ -14,7 +15,14 @@ namespace Rx.Net.StateMachine.Extensions
                 return v;
 
             if (value is JsonElement jsonElement)
-                return jsonElement.Deserialize<TValue>(options);
+                try
+                {
+                    return jsonElement.Deserialize<TValue>(options);
+                }
+                catch (JsonException) when (typeof(TValue) == typeof(string) && jsonElement.Deserialize<Unit>() == Unit.Default)
+                {
+                    return default(TValue); // TODO Remove after 01.01.2025
+                }
 
             throw new NotSupportedException($"Value type {value.GetType().FullName} is not {typeof(TValue).FullName}");
         }

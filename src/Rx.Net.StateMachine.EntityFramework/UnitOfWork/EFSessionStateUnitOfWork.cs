@@ -110,7 +110,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 .ToListAsync(cancellationToken);
 
             if (sessionId.HasValue && !sessions.Exists(s => s.SessionStateId == sessionId.Value))
-                throw new ConcurrencyException($"Session {sessionId.Value} was not persisted");
+                throw new NotPersistedException($"Session {sessionId.Value} was not persisted");
 
             return GetMemenots(sessions).ToList();
         }
@@ -213,7 +213,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                     return awf;
                 }).ToList().AggregateExpression((ex1, ex2) => ex1 || ex2);
 
-                Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> result = ss => 
+                Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> result = ss =>
                     ss.Awaiters.Where(aw => aw.IsActive).Any(aw => filter.Invoke(aw));
 
                 return result.ApplyExpressions();

@@ -40,7 +40,10 @@ namespace Rx.Net.StateMachine.Persistance
             StateMachine = stateMachine;
             _configuration = configuration;
             _jsonSerializerOptions = jsonSerializerOptions;
-            _concurrencyRetry = Policy.Handle<ConcurrencyException>().RetryForeverAsync(ex => _logger.LogWarning(ex.Message));
+            _concurrencyRetry = Policy.WrapAsync(
+                Policy.Handle<ConcurrencyException>().RetryForeverAsync(ex => _logger.LogWarning(ex.Message)),
+                Policy.Handle<NotPersistedException>().WaitAndRetryForeverAsync(i => TimeSpan.FromMinutes(Math.Pow(10, i)))
+            );
         }
 
         public WorkflowManager(ILogger<WorkflowManager<TContext>> logger, ISessionStateUnitOfWorkFactory uofFactory, IWorkflowResolver workflowResolver, IEventAwaiterResolver eventAwaiterResolver, StateMachine stateMachine, IOptions<StateMachineConfiguration> configuration)
