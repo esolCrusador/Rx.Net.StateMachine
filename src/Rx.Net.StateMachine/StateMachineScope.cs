@@ -32,7 +32,10 @@ namespace Rx.Net.StateMachine
         }
 
         public bool TryGetStep<TSource>(string stateId, [MaybeNullWhen(false)]out TSource? stepValue) =>
-            SessionState.TryGetStep(AddPrefix(stateId), StateMachine.SerializerOptions, out stepValue);
+            SessionState.TryGetStep(AddPrefix(stateId), StateMachine.SerializerOptions, null, out stepValue);
+
+        public bool TryGetStep<TSource>(string stateId, Func<JsonElement, JsonSerializerOptions, TSource>? deserializeOldValue, [MaybeNullWhen(false)] out TSource? stepValue) =>
+            SessionState.TryGetStep(AddPrefix(stateId), StateMachine.SerializerOptions, deserializeOldValue, out stepValue);
 
         public StateMachineScope BeginScope(string prefix) =>
             new StateMachineScope(StateMachine, SessionState, SessionStateStorage, CancellationToken, AddPrefix(prefix));

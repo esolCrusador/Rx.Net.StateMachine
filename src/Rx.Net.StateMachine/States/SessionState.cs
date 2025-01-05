@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
-using Rx.Net.StateMachine.Events;
+﻿using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Exceptions;
 using Rx.Net.StateMachine.Extensions;
 using System;
@@ -58,19 +57,28 @@ namespace Rx.Net.StateMachine.States
             Status = SessionStateStatus.InProgress;
         }
 
-        internal bool TryGetStep<TSource>(string stateId, JsonSerializerOptions options, [MaybeNullWhen(false)] out TSource? source)
+        internal bool TryGetStep<TSource>(string stateId, JsonSerializerOptions options, Func<JsonElement, JsonSerializerOptions, TSource>? deserializeOldValue, [MaybeNullWhen(false)] out TSource? source)
         {
             source = default;
             if (!_steps.TryGetValue(stateId, out var step))
                 return false;
 
-            source = step.State.DeserializeValue<TSource>(options);
+            Func<JsonElement, JsonSerializerOptions, TSource>? deserializeOldValueAndPersist = deserializeOldValue == null
+                ? null
+                : (jsonElement, options) =>
+                {
+                    var value = deserializeOldValue(jsonElement, options);
+                    _steps[stateId] = new SessionStateStep(value, step.SequenceNumber);
+
+                    return value;
+                };
+            source = step.State.DeserializeValue<TSource>(options, deserializeOldValueAndPersist);
             return true;
         }
 
-        internal TStep? GetStep<TStep>(string stateId, JsonSerializerOptions options)
+        internal TStep? GetStep<TStep>(string stateId, JsonSerializerOptions options, Func<JsonElement, JsonSerializerOptions, TStep>? deserializeOldValue)
         {
-            if (!TryGetStep<TStep>(stateId, options, out var step))
+            if (!TryGetStep<TStep>(stateId, options, deserializeOldValue, out var step))
                 throw new StepNotFoundException(stateId);
 
             return step;
@@ -93,7 +101,7 @@ namespace Rx.Net.StateMachine.States
             if (!_items.TryGetValue(itemId, out var itemValue))
                 return false;
 
-            var value = itemValue.DeserializeValue<TItem>(options)
+            var value = itemValue.DeserializeValue<TItem>(options, null)
                 ?? throw new InvalidOperationException($"Item {itemId} is null");
             value = updateAction(value);
 
@@ -106,7 +114,7 @@ namespace Rx.Net.StateMachine.States
             if (!_items.TryGetValue(itemId, out var itemValue))
                 return false;
 
-            var value = itemValue.DeserializeValue<TItem>(options)
+            var value = itemValue.DeserializeValue<TItem>(options, null)
                 ?? throw new InvalidOperationException($"Item {itemId} is null");
             updateAction(value);
 
@@ -149,7 +157,7 @@ namespace Rx.Net.StateMachine.States
                 return false;
             }
 
-            item = itemValue.DeserializeValue<TItem>(options);
+            item = itemValue.DeserializeValue<TItem>(options, null);
             return true;
         }
 
@@ -197,7 +205,7 @@ namespace Rx.Net.StateMachine.States
 
         internal IEnumerable<TEvent> GetEvents<TEvent>(IEventAwaiter<TEvent> eventAwaiter, Func<TEvent, bool>? filter)
         {
-            var result = _events.Where(es => es.Event is TEvent 
+            var result = _events.Where(es => es.Event is TEvent
                 && es.Awaiters?.Any(aw =>
                 {
                     if (aw.Identifier != eventAwaiter.AwaiterId)
