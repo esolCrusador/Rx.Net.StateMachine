@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reactive;
 using System.Text.Json;
 
 namespace Rx.Net.StateMachine.Extensions
@@ -17,6 +18,10 @@ namespace Rx.Net.StateMachine.Extensions
                 try
                 {
                     return jsonElement.Deserialize<TValue>(options);
+                }
+                catch (JsonException) when (typeof(TValue) == typeof(string) && jsonElement.Deserialize<Unit>() == Unit.Default) 
+                {
+                    return default; // TODO Delete after 01.03.2025
                 }
                 catch (JsonException) when (deserializeOldValue != null)
                 {

@@ -81,7 +81,7 @@ namespace Rx.Net.StateMachine
 
             return HandleWorkflowResult(workflow, sessionState, storage);
         }
-        
+
         public SessionState ParseSessionState(object context, string stateString)
         {
             var minimalSessionState = MinimalSessionState.Parse(stateString, SerializerOptions)!;
@@ -100,7 +100,7 @@ namespace Rx.Net.StateMachine
             );
         }
 
-        private async Task<HandlingResult> HandleWorkflowResult<TResult>(IFlow<TResult> workflow, SessionState sessionState, ISessionStateStorage storage)
+        private async Task<HandlingResult> HandleWorkflowResult(IFlow<string?> workflow, SessionState sessionState, ISessionStateStorage storage)
         {
             bool isFinished = default;
             int initialStepsCount = sessionState.Counter;
@@ -108,9 +108,10 @@ namespace Rx.Net.StateMachine
             Exception? exception = null;
             try
             {
-                isFinished = await workflow.Observable.Select(result => true)
-                    .DefaultIfEmpty(false)
+                var result = await workflow.Observable.Select(result => new ExecutionResult { IsFinished = true, Result = result })
+                    .DefaultIfEmpty(new ExecutionResult { IsFinished = false })
                     .ToTask(workflow.Scope.CancellationToken);
+                isFinished = result.IsFinished;
 
 
                 if (isFinished == false)
@@ -118,7 +119,7 @@ namespace Rx.Net.StateMachine
                 else
                 {
                     sessionState.Status = SessionStateStatus.Completed;
-                    sessionState.Result = "Finished";
+                    sessionState.Result = result.Result;
                 }
             }
             catch (Exception ex) when (_workflowFatalExceptions.IsFatal(ex))
@@ -145,6 +146,7 @@ namespace Rx.Net.StateMachine
                 status,
                 sessionState.Counter - initialStepsCount,
                 sessionState.Context,
+                sessionState.Result,
                 exception
             );
         }

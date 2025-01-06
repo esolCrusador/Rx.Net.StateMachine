@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
+using Polly.Retry;
 using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Persistance.Entities;
 using Rx.Net.StateMachine.Persistance.Exceptions;
@@ -223,6 +224,27 @@ namespace Rx.Net.StateMachine.Persistance
             var memento = await ouf.GetSessionState(sessionId, cancellationToken);
 
             return memento?.Entity.Status;
+        }
+
+        private static readonly AsyncRetryPolicy<ExecutionResult> _executingResultAwaiter = Policy.HandleResult<ExecutionResult>(r => !r.IsFinished)
+            .WaitAndRetryForeverAsync(i => TimeSpan.FromMilliseconds(i * 10));
+        public async Task<string?> GetResult(Guid sessionId, CancellationToken cancellationToken)
+        {
+            var result = await _executingResultAwaiter.ExecuteAsync(async cancellation =>
+            {
+                await using var ouf = _uofFactory.Create();
+                var memento = await ouf.GetSessionState(sessionId, cancellationToken);
+
+                return memento == null
+                    ? new ExecutionResult { IsFinished = false }
+                    : new ExecutionResult
+                    {
+                        IsFinished = memento.Entity.Status != SessionStateStatus.InProgress,
+                        Result = memento.Entity.Result
+                    };
+            }, cancellationToken);
+
+            return result.Result;
         }
 
         public async Task<HandlingResult> HandleEventUnpersistant<TEvent>(TEvent @event, object userContext, string state, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
