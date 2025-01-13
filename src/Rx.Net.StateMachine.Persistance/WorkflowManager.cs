@@ -43,7 +43,10 @@ namespace Rx.Net.StateMachine.Persistance
             _jsonSerializerOptions = jsonSerializerOptions;
             _concurrencyRetry = Policy.WrapAsync(
                 Policy.Handle<ConcurrencyException>().RetryForeverAsync(ex => _logger.LogWarning(ex.Message)),
-                Policy.Handle<NotPersistedException>().WaitAndRetryForeverAsync(i => TimeSpan.FromMinutes(Math.Pow(10, i)))
+                Policy.Handle<NotPersistedException>().WaitAndRetryForeverAsync(
+                    i => TimeSpan.FromMinutes(Math.Pow(10, i)),
+                    (ex, d) => _logger.LogWarning(ex.Message)
+                )
             );
         }
 
