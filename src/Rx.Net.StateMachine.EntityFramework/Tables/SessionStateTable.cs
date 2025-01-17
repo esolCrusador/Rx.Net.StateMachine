@@ -1,5 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
+﻿using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
 using Rx.Net.StateMachine.States;
 using System;
 using System.Collections.Generic;
@@ -10,7 +9,6 @@ namespace Rx.Net.StateMachine.EntityFramework.Tables
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
     public class SessionStateTable<TContext, TContextKey>
     {
-        public const int ResultLength = 1024;
         [Key] public Guid SessionStateId { get; set; }
         [StringLength(256)] public string WorkflowId { get; set; }
         public bool IsDefault { get; set; }
@@ -20,7 +18,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tables
         public string PastEvents { get; set; }
         public List<SessionEventAwaiterTable<TContext, TContextKey>> Awaiters { get; set; }
         public SessionStateStatus Status { get; set; }
-        [StringLength(ResultLength)] public string? Result { get; set; }
+        public string? Result { get; set; }
         public TContextKey ContextId { get; set; }
         public TContext Context { get; set; }
         public DateTimeOffset CrearedAt { get; set; }

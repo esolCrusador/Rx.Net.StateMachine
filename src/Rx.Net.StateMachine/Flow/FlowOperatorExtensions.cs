@@ -188,6 +188,11 @@ namespace Rx.Net.StateMachine.Flow
             return source.Select(s => Unit.Default);
         }
 
+        public static IFlow<string?> MapToNull<TSource>(this IFlow<TSource> source)
+        {
+            return source.Select(s => default(string));
+        }
+
         public static IFlow<TResult> MapTo<TSource, TResult>(this IFlow<TSource> source, TResult result)
         {
             return source.Select(s => result);

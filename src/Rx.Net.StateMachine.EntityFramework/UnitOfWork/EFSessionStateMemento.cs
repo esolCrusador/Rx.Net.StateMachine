@@ -112,8 +112,6 @@ namespace Rx.Net.StateMachine.EntityFramework.UnitOfWork
 
             dest.Status = source.Status;
             dest.Result = source.Result;
-            if (dest.Result?.Length > SessionStateTable<TContext, TContextKey>.ResultLength)
-                dest.Result = dest.Result.Substring(0, SessionStateTable<TContext, TContextKey>.ResultLength);
         }
     }
 }

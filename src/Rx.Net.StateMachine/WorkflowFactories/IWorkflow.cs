@@ -1,5 +1,4 @@
 ﻿using Rx.Net.StateMachine.Flow;
-using System;
 using System.Reactive;
 
 namespace Rx.Net.StateMachine.WorkflowFactories
@@ -8,11 +7,11 @@ namespace Rx.Net.StateMachine.WorkflowFactories
     {
         string WorkflowId { get; }
         bool IsPersistant { get; }
-        IFlow<Unit> Execute(IFlow<Unit> flow);
+        IFlow<string?> Execute(IFlow<Unit> flow);
     }
 
     public interface IWorkflow<TSource> : IWorkflow
     {
-        IFlow<Unit> Execute(IFlow<TSource> flow);
+        IFlow<string?> Execute(IFlow<TSource> flow);
     }
 }

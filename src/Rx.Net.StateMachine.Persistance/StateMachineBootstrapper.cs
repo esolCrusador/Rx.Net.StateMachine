@@ -97,7 +97,9 @@ namespace Rx.Net.StateMachine.Persistance
 
         public static IServiceCollection AddWorkflows(this IServiceCollection services, Assembly assembly)
         {
-            var worklowTypes = assembly.GetTypes().Where(at => at.IsClass && !at.IsAbstract && at.GetInterface(nameof(IWorkflow)) != null);
+            var worklowTypes = assembly.GetTypes().Where(at => at.IsClass && !at.IsAbstract 
+                && at.GetInterface(nameof(IWorkflow)) != null
+                && at.GetCustomAttribute<ObsoleteAttribute>() == null);
             foreach (var wft in worklowTypes)
                 AddWorkflow(services, wft);
 

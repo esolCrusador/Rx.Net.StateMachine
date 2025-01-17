@@ -6,7 +6,7 @@ namespace Rx.Net.StateMachine.Extensions
 {
     public static class SerializationExtensions
     {
-        public static TValue? DeserializeValue<TValue>(this object? value, JsonSerializerOptions options)
+        public static TValue? DeserializeValue<TValue>(this object? value, JsonSerializerOptions options, Func<JsonElement, JsonSerializerOptions, TValue>? deserializeOldValue)
         {
             if (value == default)
                 return default;
@@ -19,9 +19,13 @@ namespace Rx.Net.StateMachine.Extensions
                 {
                     return jsonElement.Deserialize<TValue>(options);
                 }
-                catch (JsonException) when (typeof(TValue) == typeof(string) && jsonElement.Deserialize<Unit>() == Unit.Default)
+                catch (JsonException) when (typeof(TValue) == typeof(string) && jsonElement.Deserialize<Unit>() == Unit.Default) 
                 {
-                    return default(TValue); // TODO Remove after 01.01.2025
+                    return default; // TODO Delete after 01.03.2025
+                }
+                catch (JsonException) when (deserializeOldValue != null)
+                {
+                    return deserializeOldValue(jsonElement, options);
                 }
 
             throw new NotSupportedException($"Value type {value.GetType().FullName} is not {typeof(TValue).FullName}");

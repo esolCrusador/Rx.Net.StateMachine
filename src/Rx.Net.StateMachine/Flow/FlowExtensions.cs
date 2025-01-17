@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
+using System.Text.Json;
 
 namespace Rx.Net.StateMachine.Flow
 {
@@ -13,6 +14,19 @@ namespace Rx.Net.StateMachine.Flow
         public static IFlow<TElement> Persist<TElement>(this IFlow<TElement> flow, string stateId)
         {
             if (flow.Scope.TryGetStep<TElement>(stateId, out var stepValue))
+                return flow.Scope.StartFlow(stepValue!);
+
+            return flow.SelectAsync(async s =>
+            {
+                await flow.Scope.AddStep(stateId, s);
+
+                return s;
+            });
+        }
+
+        public static IFlow<TElement> Persist<TElement>(this IFlow<TElement> flow, string stateId, Func<JsonElement, JsonSerializerOptions, TElement> deserializeOldValue)
+        {
+            if (flow.Scope.TryGetStep<TElement>(stateId, deserializeOldValue, out var stepValue))
                 return flow.Scope.StartFlow(stepValue!);
 
             return flow.SelectAsync(async s =>
