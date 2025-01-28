@@ -161,7 +161,7 @@ namespace Rx.Net.StateMachine.States
             return true;
         }
 
-        internal TItem? GetItem<TItem>(string itemId, JsonSerializerOptions options)
+        internal TItem GetItem<TItem>(string itemId, JsonSerializerOptions options)
         {
             if (!TryGetItem<TItem>(itemId, options, out var item))
                 throw new ItemNotFoundException(itemId);

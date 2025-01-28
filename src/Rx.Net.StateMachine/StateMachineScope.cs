@@ -31,7 +31,7 @@ namespace Rx.Net.StateMachine
             StatePrefix = prefix;
         }
 
-        public bool TryGetStep<TSource>(string stateId, [MaybeNullWhen(false)]out TSource? stepValue) =>
+        public bool TryGetStep<TSource>(string stateId, [MaybeNullWhen(false)] out TSource? stepValue) =>
             SessionState.TryGetStep(AddPrefix(stateId), StateMachine.SerializerOptions, null, out stepValue);
 
         public bool TryGetStep<TSource>(string stateId, Func<JsonElement, JsonSerializerOptions, TSource>? deserializeOldValue, [MaybeNullWhen(false)] out TSource? stepValue) =>
@@ -121,11 +121,23 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
+        public Task AddGlobalItem<TItem>(string itemId, TItem item)
+        {
+            SessionState.AddItem($"Global.{itemId}", item, StateMachine.SerializerOptions);
+
+            return SessionStateStorage.PersistItemState(SessionState);
+        }
+
         public Task AddOrUpdateGlobalItem<TItem>(string itemId, TItem item)
         {
             SessionState.UpdateItem($"Global.{itemId}", item, StateMachine.SerializerOptions);
 
             return SessionStateStorage.PersistItemState(SessionState);
+        }
+
+        public bool TryGetGlobalItem<TItem>(string itemId, [MaybeNullWhen(false)] out TItem? item)
+        {
+            return SessionState.TryGetItem($"Global.{itemId}", StateMachine.SerializerOptions, out item);
         }
 
         public Task UpdateItem<TItem>(string itemId, TItem item)
@@ -135,9 +147,14 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
-        public TItem? GetItem<TItem>(string itemId)
+        public TItem GetItem<TItem>(string itemId)
         {
             return SessionState.GetItem<TItem>(AddPrefix(itemId), StateMachine.SerializerOptions);
+        }
+
+        public bool TryGetItem<TItem>(string itemId, [MaybeNullWhen(false)] out TItem? item)
+        {
+            return SessionState.TryGetItem<TItem>(AddPrefix(itemId), StateMachine.SerializerOptions, out item);
         }
 
         public TItem? GetItemOrDefault<TItem>(string itemId, TItem? defaultItem = default)
@@ -180,7 +197,7 @@ namespace Rx.Net.StateMachine
         }
 
         public Task EventHandled<TEvent>(TEvent e)
-            where TEvent: class
+            where TEvent : class
         {
             SessionState.MarkEventAsHandled(e, StateMachine.SerializerOptions);
 
