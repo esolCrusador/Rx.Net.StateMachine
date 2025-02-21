@@ -1,6 +1,5 @@
 ﻿using Rx.Net.StateMachine.Events;
 using System;
-using System.Reactive.Linq;
 
 namespace Rx.Net.StateMachine.Flow
 {

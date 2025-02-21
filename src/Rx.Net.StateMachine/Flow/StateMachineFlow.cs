@@ -2,7 +2,7 @@
 
 namespace Rx.Net.StateMachine.Flow
 {
-    public class StateMachineFlow<TElement>: IFlow<TElement>
+    public class StateMachineFlow<TElement> : IFlow<TElement>
     {
         private readonly StateMachineScope _scope;
         private readonly IObservable<TElement> _observable;

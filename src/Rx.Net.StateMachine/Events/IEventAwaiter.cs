@@ -5,7 +5,7 @@
         public string AwaiterId { get; }
     }
 
-    public interface IEventAwaiter<TEvent>: IEventAwaiter
+    public interface IEventAwaiter<TEvent> : IEventAwaiter
     {
     }
 }

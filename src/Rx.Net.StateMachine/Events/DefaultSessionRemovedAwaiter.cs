@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Rx.Net.StateMachine.Events
+﻿namespace Rx.Net.StateMachine.Events
 {
     public class DefaultSessionRemovedAwaiter : IEventAwaiter<DefaultSessionRemoved>
     {

@@ -14,7 +14,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.Tables
         public Guid SessionStateId { get; set; }
         [Column(TypeName = "varchar(5000)")] public string Name { get; set; }
         [StringLength(256), Column(TypeName = "varchar(256)")] public string Identifier { get; set; }
-        [StringLength(256), Column(TypeName = "varchar(256)")] public string? IgnoreIdentifier {  get; set; }
+        [StringLength(256), Column(TypeName = "varchar(256)")] public string? IgnoreIdentifier { get; set; }
         public int SequenceNumber { get; set; }
         public bool IsActive { get; set; } = true;
         public TContextKey ContextId { get; set; }

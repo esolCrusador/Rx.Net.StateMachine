@@ -1,5 +1,4 @@
-﻿using Rx.Net.StateMachine.EntityFramework.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace Rx.Net.StateMachine.EntityFramework.Extensions

@@ -34,7 +34,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Extensions
             }
         }
 
-        private class Unsubscribe: IDisposable
+        private class Unsubscribe : IDisposable
         {
             private readonly Action _unsubscribe;
 

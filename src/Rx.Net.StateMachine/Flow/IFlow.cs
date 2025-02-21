@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Rx.Net.StateMachine.Flow
 {
@@ -8,7 +6,7 @@ namespace Rx.Net.StateMachine.Flow
     {
         public StateMachineScope Scope { get; }
     }
-    public interface IFlow<TElement>: IFlow
+    public interface IFlow<TElement> : IFlow
     {
         internal IObservable<TElement> Observable { get; }
     }

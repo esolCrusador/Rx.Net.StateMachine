@@ -8,7 +8,6 @@ using Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork;
 using Rx.Net.StateMachine.EntityFramework.UnitOfWork;
 using Rx.Net.StateMachine.Events;
 using Rx.Net.StateMachine.Persistance;
-using Rx.Net.StateMachine.WorkflowFactories;
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;

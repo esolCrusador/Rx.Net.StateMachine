@@ -1,5 +1,4 @@
-﻿using Rx.Net.StateMachine.Extensions;
-using System;
+﻿using System;
 using System.Reflection;
 
 namespace Rx.Net.StateMachine.WorkflowFactories

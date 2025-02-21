@@ -2,6 +2,6 @@
 {
     public interface IEventAwaiterIgnore
     {
-        public string IgnoreIdentifier {  get; }
+        public string IgnoreIdentifier { get; }
     }
 }

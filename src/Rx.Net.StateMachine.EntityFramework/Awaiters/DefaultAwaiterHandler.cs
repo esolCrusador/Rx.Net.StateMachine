@@ -14,14 +14,14 @@ namespace Rx.Net.StateMachine.EntityFramework.Awaiters
         private readonly Func<object, IStaleSessionVersion>? _getSessionVersionToIgnore;
 
         public DefaultAwaiterHandler(
-            Func<TEvent, Expression<Func<SessionStateTable<TContext, TContextKey>, bool>>>? sessionStateFilter, 
+            Func<TEvent, Expression<Func<SessionStateTable<TContext, TContextKey>, bool>>>? sessionStateFilter,
             IReadOnlyCollection<Type> awaiterIdTypes,
             Func<TEvent, IStaleSessionVersion>? getSessionVersionToIgnore
         )
         {
             SessionStateFilter = sessionStateFilter;
             _awaiterIdTypes = awaiterIdTypes;
-            _getSessionVersionToIgnore = getSessionVersionToIgnore == null ? null : ev =>  getSessionVersionToIgnore((TEvent) ev);
+            _getSessionVersionToIgnore = getSessionVersionToIgnore == null ? null : ev => getSessionVersionToIgnore((TEvent)ev);
         }
 
         public Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> GetSessionStateFilter(TEvent ev) =>

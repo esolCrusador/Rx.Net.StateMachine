@@ -6,8 +6,8 @@ using Rx.Net.StateMachine.Persistance;
 using System.Text.Json;
 
 public class EFSessionStateUnitOfWorkFactory<TContext, TContextKey, TUnitOfWork> : ISessionStateUnitOfWorkFactory
-    where TContext: class
-    where TUnitOfWork: EFSessionStateUnitOfWork<TContext, TContextKey>, new()
+    where TContext : class
+    where TUnitOfWork : EFSessionStateUnitOfWork<TContext, TContextKey>, new()
 {
     private readonly SessionStateDbContextFactory _contextFactory;
     private readonly ContextKeySelector<TContext, TContextKey> _contextKeySelector;
