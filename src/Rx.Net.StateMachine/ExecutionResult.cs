@@ -2,7 +2,7 @@
 {
     public struct ExecutionResult
     {
-        public required bool IsFinished {  get; set; }
-        public string? Result {  get; set; }
+        public required bool IsFinished { get; set; }
+        public string? Result { get; set; }
     }
 }

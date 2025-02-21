@@ -1,7 +1,4 @@
-﻿using Rx.Net.StateMachine.Extensions;
-using System.Text.Json;
-
-namespace Rx.Net.StateMachine.States
+﻿namespace Rx.Net.StateMachine.States
 {
     public class SessionStateStep
     {

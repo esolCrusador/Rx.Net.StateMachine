@@ -3,11 +3,11 @@ using System.Linq.Expressions;
 
 namespace Rx.Net.StateMachine.Extensions
 {
-    internal class ExpressionRebinder: ExpressionVisitor
+    internal class ExpressionRebinder : ExpressionVisitor
     {
         private readonly Dictionary<Expression, Expression> _rebindMap;
 
-        public ExpressionRebinder(Dictionary<Expression, Expression> rebindMap) => 
+        public ExpressionRebinder(Dictionary<Expression, Expression> rebindMap) =>
             _rebindMap = rebindMap;
 
         public ExpressionRebinder(Expression from, Expression to) : this(new Dictionary<Expression, Expression> { [from] = to })

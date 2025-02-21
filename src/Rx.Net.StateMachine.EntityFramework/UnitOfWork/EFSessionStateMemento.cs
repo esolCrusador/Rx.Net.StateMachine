@@ -3,7 +3,6 @@ using Rx.Net.StateMachine.EntityFramework.ContextDfinition;
 using Rx.Net.StateMachine.EntityFramework.Extensions;
 using Rx.Net.StateMachine.EntityFramework.Tables;
 using Rx.Net.StateMachine.EntityFramework.Tests.Tables;
-using Rx.Net.StateMachine.Extensions;
 using Rx.Net.StateMachine.Persistance;
 using Rx.Net.StateMachine.Persistance.Entities;
 using Rx.Net.StateMachine.Persistance.Exceptions;

@@ -8,7 +8,7 @@ namespace Rx.Net.StateMachine
         public HandlingStatus Status { get; }
         public object UserContext { get; }
         public int PassedSteps { get; }
-        public string? Result {  get; }
+        public string? Result { get; }
         public Exception? Exception { get; }
         public HandlingResult(Guid? sessionId, HandlingStatus status, int passedSteps, object userContext, string? result, Exception? exception)
         {

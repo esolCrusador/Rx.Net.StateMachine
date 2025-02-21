@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-
-namespace Rx.Net.StateMachine.WorkflowFactories
+﻿namespace Rx.Net.StateMachine.WorkflowFactories
 {
     public interface IWorkflowResolver
     {

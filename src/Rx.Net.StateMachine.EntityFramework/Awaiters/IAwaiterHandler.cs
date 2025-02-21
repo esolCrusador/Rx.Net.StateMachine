@@ -12,7 +12,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Awaiters
         public IEnumerable<Type> GetAwaiterIdTypes();
         public IStaleSessionVersion? GetStaleSessionVersion(object ev);
     }
-    public interface IAwaiterHandler<TContext, TContextKey, TEvent>: IAwaiterHandler<TContext, TContextKey>
+    public interface IAwaiterHandler<TContext, TContextKey, TEvent> : IAwaiterHandler<TContext, TContextKey>
     {
         public Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> GetSessionStateFilter(TEvent ev);
     }
