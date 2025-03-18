@@ -5,6 +5,7 @@ using Rx.Net.StateMachine.Storage;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -133,6 +134,34 @@ namespace Rx.Net.StateMachine
 
             return SessionStateStorage.PersistItemState(SessionState);
         }
+
+        public IItems GetGlobalItemsAndVariables() => SessionState.GetItemsByPrefix("Global.").ToDictionary();
+        public Task SetVariable(string name, string? value)
+        {
+            SessionState.UpdateItem(GetVariableItemName(name), value, StateMachine.SerializerOptions);
+
+            return SessionStateStorage.PersistItemState(SessionState);
+        }
+        public Dictionary<string, string?> GetVariables(IReadOnlyCollection<string> names)
+        {
+            Dictionary<string, string?> result = new Dictionary<string, string?>(names.Count);
+            foreach (var name in names)
+            {
+                if (SessionState.TryGetItem<string?>(GetVariableItemName(name), StateMachine.SerializerOptions, out var item))
+                    result.Add(name, item);
+                else
+                    result.Add(name, null);
+            }
+
+            return result;
+        }
+
+        public static string GetVariableItemName(string variableName) => $"Global.Variable.{variableName}";
+        public string? GetVariableOrDefault(string variableName, string? defaultValue = default) =>
+            SessionState.GetItemOrDefault<string?>(GetVariableItemName(variableName), StateMachine.SerializerOptions, defaultValue);
+
+        public bool TryGetVariable(string variableName, [MaybeNullWhen(false)] out string? result) =>
+            SessionState.TryGetItem<string?>(GetVariableItemName(variableName), StateMachine.SerializerOptions, out result);
 
         public bool TryGetGlobalItem<TItem>(string itemId, [MaybeNullWhen(false)] out TItem? item)
         {

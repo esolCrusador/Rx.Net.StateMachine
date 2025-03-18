@@ -58,17 +58,17 @@ namespace Rx.Net.StateMachine
             return HandleWorkflowResult(workflow, sessionState, storage);
         }
 
-        public Task<HandlingResult> StartHandleWorkflow(object context, ISessionStateStorage storage, IWorkflow workflowFactory, CancellationToken cancellationToken)
+        public Task<HandlingResult> StartHandleWorkflow(object context, IItems? items, ISessionStateStorage storage, IWorkflow workflowFactory, CancellationToken cancellationToken)
         {
-            var sessionState = new SessionState(workflowFactory.WorkflowId, context);
+            var sessionState = new SessionState(workflowFactory.WorkflowId, context, items);
             var workflow = workflowFactory.Execute(new StateMachineScope(this, sessionState, storage, cancellationToken).StartFlow());
 
             return HandleWorkflowResult(workflow, sessionState, storage);
         }
 
-        public Task<HandlingResult> StartHandleWorkflow<TSource>(TSource source, object context, ISessionStateStorage storage, IWorkflow<TSource> workflowFactory, CancellationToken cancellationToken)
+        public Task<HandlingResult> StartHandleWorkflow<TSource>(TSource source, object context, IItems? items, ISessionStateStorage storage, IWorkflow<TSource> workflowFactory, CancellationToken cancellationToken)
         {
-            var sessionState = new SessionState(workflowFactory.WorkflowId, context);
+            var sessionState = new SessionState(workflowFactory.WorkflowId, context, items);
             var workflow = workflowFactory.Execute(new StateMachineScope(this, sessionState, storage, cancellationToken).StartFlow(source));
 
             return HandleWorkflowResult(workflow, sessionState, storage);

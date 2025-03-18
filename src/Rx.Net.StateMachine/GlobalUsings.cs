@@ -1,0 +1,1 @@
+﻿global using IItems = System.Collections.Generic.Dictionary<string, object?>;

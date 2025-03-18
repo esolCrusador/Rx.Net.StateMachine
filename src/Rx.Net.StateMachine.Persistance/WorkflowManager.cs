@@ -61,6 +61,7 @@ namespace Rx.Net.StateMachine.Persistance
             private readonly IWorkflowResolver _workflowResolver;
             private readonly TContext _context;
             private BeforePersistScope? _beforePersistScope;
+            private IItems? _items;
 
             public WorkflowRunner(WorkflowManager<TContext> workflowManager, IWorkflowResolver workflowResolver, TContext context)
             {
@@ -73,36 +74,41 @@ namespace Rx.Net.StateMachine.Persistance
                 _beforePersistScope = beforePersistScope;
                 return this;
             }
+            public WorkflowRunner WithItems(IItems items)
+            {
+                _items = items;
+                return this;
+            }
             public async Task<HandlingResult> Workflow<TWorkflow>(CancellationToken cancellationToken) where TWorkflow : class, IWorkflow
             {
                 await using var workflowSession = _workflowResolver.GetWorkflowSession<TWorkflow>(_beforePersistScope, _context);
-                return await _workflowManager.StartHandle(workflowSession, _context, cancellationToken);
+                return await _workflowManager.StartHandle(workflowSession, _context, _items, cancellationToken);
             }
 
             public async Task<HandlingResult> Workflow(string workflowId, CancellationToken cancellationToken)
             {
                 await using var workflowSession = _workflowResolver.GetWorkflowSession(workflowId, _beforePersistScope, _context);
-                return await _workflowManager.StartHandle(workflowSession, _context, cancellationToken);
+                return await _workflowManager.StartHandle(workflowSession, _context, _items, cancellationToken);
             }
         }
 
         public WorkflowRunner Start(TContext context) =>
             new WorkflowRunner(this, _workflowResolver, context);
 
-        private async Task<HandlingResult> StartHandle(WorkflowSession workflowSession, TContext context, CancellationToken cancellationToken)
+        private async Task<HandlingResult> StartHandle(WorkflowSession workflowSession, TContext context, IItems? items, CancellationToken cancellationToken)
         {
             if (context == null)
                 throw new ArgumentNullException("context");
 
             if (!workflowSession.Workflow.IsPersistant)
-                return await StateMachine.StartHandleWorkflow(context,
+                return await StateMachine.StartHandleWorkflow(context, items,
                     SessionStateStorage.NonePersistent(workflowSession.BeforePersist),
                     workflowSession.Workflow,
                     cancellationToken
                 );
 
             await using var uof = _uofFactory.Create();
-            var sessionStateMemento = CreateNewSessionState(workflowSession.Workflow.WorkflowId, uof, context);
+            var sessionStateMemento = CreateNewSessionState(workflowSession.Workflow.WorkflowId, uof, context, items);
             var sessionState = ToSessionState(sessionStateMemento.Entity);
 
             return await HandleSessionState(sessionState, workflowSession, sessionStateMemento, cancellationToken);
@@ -115,6 +121,7 @@ namespace Rx.Net.StateMachine.Persistance
             private readonly TContext _context;
             private readonly TSource _source;
             private BeforePersistScope? _beforePersistScope;
+            private IItems? _items;
 
             public WorkflowRunner(WorkflowManager<TContext> workflowManager, IWorkflowResolver workflowResolver, TContext context, TSource source)
             {
@@ -130,36 +137,42 @@ namespace Rx.Net.StateMachine.Persistance
                 return this;
             }
 
+            public WorkflowRunner<TSource> WithItems(IItems items)
+            {
+                _items = items;
+                return this;
+            }
+
             public async Task<HandlingResult> Workflow<TWorkflow>(CancellationToken cancellationToken) where TWorkflow : class, IWorkflow<TSource>
             {
                 await using var workflowSession = _workflowResolver.GetWorkflowSession<TWorkflow>(_beforePersistScope, _context);
-                return await _workflowManager.StartHandle(_source, workflowSession, _context, cancellationToken);
+                return await _workflowManager.StartHandle(_source, workflowSession, _items, _context, cancellationToken);
             }
 
             public async Task<HandlingResult> Workflow(string workflowId, CancellationToken cancellationToken)
             {
                 await using var workflowSession = _workflowResolver.GetWorkflowSession(workflowId, _beforePersistScope, _context);
-                return await _workflowManager.StartHandle(_source, workflowSession, _context, cancellationToken);
+                return await _workflowManager.StartHandle(_source, workflowSession, _items, _context, cancellationToken);
             }
         }
 
         public WorkflowRunner<TSource> Start<TSource>(TContext context, TSource source) =>
             new WorkflowRunner<TSource>(this, _workflowResolver, context, source);
 
-        private async Task<HandlingResult> StartHandle<TSource>(TSource source, WorkflowSession workflowSession, TContext context, CancellationToken cancellationToken)
+        private async Task<HandlingResult> StartHandle<TSource>(TSource source, WorkflowSession workflowSession, IItems? items, TContext context, CancellationToken cancellationToken)
         {
             if (context == null)
                 throw new ArgumentNullException("context");
             if (!workflowSession.Workflow.IsPersistant)
                 return await StateMachine.StartHandleWorkflow<TSource>(
-                    source, context,
+                    source, context, items,
                     SessionStateStorage.NonePersistent(workflowSession.BeforePersist),
                     (IWorkflow<TSource>)workflowSession.Workflow,
                     cancellationToken
                 );
 
             await using var uof = _uofFactory.Create();
-            var sessionStateMemento = CreateNewSessionState(workflowSession.Workflow.WorkflowId, uof, context);
+            var sessionStateMemento = CreateNewSessionState(workflowSession.Workflow.WorkflowId, uof, context, items);
             var sessionState = ToSessionState(sessionStateMemento.Entity);
 
             return await StartHandleSessionState<TSource>(source, sessionStateMemento.Entity, sessionState, workflowSession, sessionStateMemento, cancellationToken);
@@ -351,7 +364,7 @@ namespace Rx.Net.StateMachine.Persistance
             return results.Select(r => r.Result!).ToList();
         }
 
-        private ISessionStateMemento CreateNewSessionState(string workflowId, ISessionStateUnitOfWork uof, TContext context)
+        private ISessionStateMemento CreateNewSessionState(string workflowId, ISessionStateUnitOfWork uof, TContext context, IReadOnlyCollection<KeyValuePair<string, object?>>? items)
         {
             var sessionState = new SessionStateEntity
             {
@@ -359,7 +372,7 @@ namespace Rx.Net.StateMachine.Persistance
                 WorkflowId = workflowId,
                 Status = SessionStateStatus.InProgress,
                 Steps = new List<SessionStepEntity>(),
-                Items = new List<SessionItemEntity>(),
+                Items = items?.Select(i => new SessionItemEntity { Id = i.Key, Value = i.Value }).ToList() ?? new List<SessionItemEntity>(),
                 Awaiters = new List<SessionEventAwaiterEntity>(),
                 Counter = 0,
                 PastEvents = new List<SessionEventEntity>(),

@@ -52,7 +52,7 @@ namespace Rx.Net.StateMachine.States
             );
         }
 
-        public SessionState(string workflowId, object context) : this(null, workflowId, context, false, 0, new Dictionary<string, SessionStateStep>(), new Dictionary<string, object?>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
+        public SessionState(string workflowId, object context, IItems? items) : this(null, workflowId, context, false, 0, new Dictionary<string, SessionStateStep>(), items?.ToDictionary() ?? new Dictionary<string, object?>(), new List<PastSessionEvent>(), new List<SessionEventAwaiter>())
         {
             Status = SessionStateStatus.InProgress;
         }
@@ -161,12 +161,15 @@ namespace Rx.Net.StateMachine.States
             return true;
         }
 
+        internal IEnumerable<KeyValuePair<string, object?>> GetItemsByPrefix(string prefix) =>
+            _items.Where(kvp => kvp.Key.StartsWith(prefix));
+
         internal TItem GetItem<TItem>(string itemId, JsonSerializerOptions options)
         {
             if (!TryGetItem<TItem>(itemId, options, out var item))
                 throw new ItemNotFoundException(itemId);
 
-            return item;
+            return item!;
         }
 
         internal TItem? GetItemOrDefault<TItem>(string itemId, JsonSerializerOptions options, TItem? defaultItem = default)
