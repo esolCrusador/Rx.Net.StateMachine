@@ -356,7 +356,7 @@ namespace Rx.Net.StateMachine.Persistance
                     throw concurrencyException;
 
                 if (exceptions.Count == 1)
-                    throw exceptions.Single();
+                    exceptions.Single().Rethrow();
 
                 throw new AggregateException("Multiple tasks failed", exceptions);
             }
