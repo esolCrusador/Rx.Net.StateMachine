@@ -353,7 +353,7 @@ namespace Rx.Net.StateMachine.Persistance
                 var concurrencyException = exceptions.OfType<ConcurrencyException>().FirstOrDefault();
 
                 if (concurrencyException != null)
-                    throw concurrencyException;
+                    concurrencyException.Rethrow();
 
                 if (exceptions.Count == 1)
                     exceptions.Single().Rethrow();
