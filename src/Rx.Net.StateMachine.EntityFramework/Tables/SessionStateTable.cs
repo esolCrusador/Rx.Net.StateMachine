@@ -3,6 +3,7 @@ using Rx.Net.StateMachine.States;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Rx.Net.StateMachine.EntityFramework.Tables
 {
@@ -23,7 +24,11 @@ namespace Rx.Net.StateMachine.EntityFramework.Tables
         public TContext Context { get; set; }
         public DateTimeOffset CrearedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
-        [Timestamp] public byte[] ConcurrencyToken { get; set; }
+        [Timestamp] public byte[] ConcurrencyToken { get; set; } // MsSql concurrency token
+        // https://stackoverflow.com/questions/78974688/npgsql-ef-core-concurrency-token-property-gets-included-in-migrations
+        // https://www.npgsql.org/efcore/modeling/concurrency.html?tabs=data-annotations
+        // Ignore one of them based on database
+        [ConcurrencyCheck, Column("xmin", TypeName = "xid")] public uint PostgressConcurrencyToken { get; set; } // PostgreSql row counter
     }
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
 }

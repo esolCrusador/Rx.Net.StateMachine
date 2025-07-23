@@ -12,6 +12,7 @@ namespace Rx.Net.StateMachine.EntityFramework.ContextDfinition
         public string SessionStateTableName { get; set; } = "SessionStates";
         public string SessionEventAwaiterTableName { get; set; } = "SessionStateAwaiters";
         public Func<string, string> EscapePropertyName { get; set; } = name => $"[{name}]";
+        public Func<bool, string> GetBoolean { get; set; } = value => value ? "1" : "0";
         public Action<EntityTypeBuilder<SessionStateTable<TContext, TContextKey>>> ConfigureSessionStateTable { get; set; } = _ => { };
     }
     public static class SessionStateDbContextExtensions
@@ -32,7 +33,7 @@ namespace Rx.Net.StateMachine.EntityFramework.ContextDfinition
             {
                 builder.ToTable(options.SessionEventAwaiterTableName);
                 builder.HasIndex(aw => new { aw.IsActive, aw.Identifier })
-                    .HasFilter($"{options.EscapePropertyName(nameof(SessionEventAwaiterTable<TContext, TContextKey>.IsActive))} = 1");
+                    .HasFilter($"{options.EscapePropertyName(nameof(SessionEventAwaiterTable<TContext, TContextKey>.IsActive))} = {options.GetBoolean(true)}");
             });
             modelBuilder.Entity<TContext>();
         }
