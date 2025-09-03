@@ -44,7 +44,7 @@ namespace Rx.Net.StateMachine.Persistance
             _concurrencyRetry = Policy.WrapAsync(
                 Policy.Handle<ConcurrencyException>().RetryForeverAsync(ex => _logger.LogWarning(ex.Message)),
                 Policy.Handle<NotPersistedException>().WaitAndRetryForeverAsync(
-                    i => TimeSpan.FromMilliseconds(10 * i + Math.Pow(10, i)),
+                    i => TimeSpan.FromMilliseconds(10 * i + Math.Pow(5, i)),
                     (ex, d) => _logger.LogWarning("Error: {Exception}. Waiting: {d}", ex.Message, d)
                 )
             );
