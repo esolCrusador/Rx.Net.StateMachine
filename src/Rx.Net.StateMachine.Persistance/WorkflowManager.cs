@@ -392,7 +392,7 @@ namespace Rx.Net.StateMachine.Persistance
 
             bool isAdded = StateMachine.AddEvent(sessionState, @event, _eventAwaiterResolver.GetEventAwaiters(@event));
             if (!isAdded)
-                return HandlingResult.Ignored(sessionStateEntity.SessionStateId, sessionState.Context);
+                return HandlingResult.Ignored(sessionStateEntity.SessionStateId);
 
             return await HandleSessionState(sessionState, sessionStateMemento, beforePersist, cancellationToken);
         }
@@ -409,7 +409,7 @@ namespace Rx.Net.StateMachine.Persistance
                 isAdded = StateMachine.AddEvent(sessionState, @event, _eventAwaiterResolver.GetEventAwaiters(@event)) || isAdded;
 
             if (!isAdded)
-                return HandlingResult.Ignored(sessionStateEntity.SessionStateId, sessionState.Context);
+                return HandlingResult.Ignored(sessionStateEntity.SessionStateId);
 
             return await HandleSessionState(sessionState, sessionStateMemento, beforePersist, cancellationToken);
         }

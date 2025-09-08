@@ -144,7 +144,6 @@ namespace Rx.Net.StateMachine
                 sessionState.SessionStateId,
                 status,
                 sessionState.Counter - initialStepsCount,
-                sessionState.Context,
                 sessionState.Result,
                 exception
             );

@@ -6,21 +6,19 @@ namespace Rx.Net.StateMachine
     {
         public Guid? SessionId { get; }
         public HandlingStatus Status { get; }
-        public object UserContext { get; }
         public int PassedSteps { get; }
         public string? Result { get; }
         public Exception? Exception { get; }
-        public HandlingResult(Guid? sessionId, HandlingStatus status, int passedSteps, object userContext, string? result, Exception? exception)
+        public HandlingResult(Guid? sessionId, HandlingStatus status, int passedSteps, string? result, Exception? exception)
         {
             SessionId = sessionId;
             Status = status;
             PassedSteps = passedSteps;
-            UserContext = userContext;
             Result = result;
             Exception = exception;
         }
-        public static HandlingResult Ignored(Guid sessionId, object userContext) =>
-            new HandlingResult(sessionId, HandlingStatus.Ignored, 0, userContext, null, null);
+        public static HandlingResult Ignored(Guid sessionId) =>
+            new HandlingResult(sessionId, HandlingStatus.Ignored, 0, null, null);
     }
 
     public enum HandlingStatus
