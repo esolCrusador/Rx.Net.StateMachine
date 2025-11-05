@@ -46,7 +46,7 @@ namespace Rx.Net.StateMachine.Flow
         public static IFlow<TResult> Loop<TResult>(this StateMachineScope scope, string prefix, Func<StateMachineScope, IFlow<TResult>> iteration, Func<TResult, StateMachineScope, bool>? exit = null)
         {
             return scope.StartFlow().SelectAsync(async () =>
-                LoopIteration(await scope.BeginRecursiveScope(prefix), iteration, exit)
+                LoopIteration(await scope.BeginRecursiveScopeAsync(prefix), iteration, exit)
             );
         }
 
@@ -57,7 +57,7 @@ namespace Rx.Net.StateMachine.Flow
                 if (exit?.Invoke(r, scope) == true)
                     return scope.StartFlow(r);
 
-                return scope.StartFlow(() => scope.IncreaseRecursionDepth())
+                return scope.StartFlow(() => scope.IncreaseRecursionDepthAsync())
                     .Select(_ => LoopIteration(scope, iteration, exit));
             });
         }

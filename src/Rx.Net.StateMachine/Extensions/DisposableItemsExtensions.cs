@@ -15,7 +15,7 @@ namespace Rx.Net.StateMachine.Extensions
 
         public static Task PersistDisposableItem<TItemId>(this StateMachineScope scope, TItemId messageId, string messagesCollectition = "Messages")
         {
-            return scope.AddOrUpdateItem(messagesCollectition, () => new List<TItemId> { messageId }, items =>
+            return scope.AddOrUpdateItemAsync(messagesCollectition, () => new List<TItemId> { messageId }, items =>
             {
                 items.Add(messageId);
                 return items;
@@ -31,7 +31,7 @@ namespace Rx.Net.StateMachine.Extensions
 
         public static Task PersistDisposableItem<TItem, TItemId>(this StateMachineScope scope, TItem message, Func<TItem, TItemId> idSelector, string messagesCollectition = "Messages")
         {
-            return scope.AddOrUpdateItem(messagesCollectition, () => new List<TItemId> { idSelector(message) }, items =>
+            return scope.AddOrUpdateItemAsync(messagesCollectition, () => new List<TItemId> { idSelector(message) }, items =>
             {
                 items.Add(idSelector(message));
                 return items;
@@ -45,7 +45,7 @@ namespace Rx.Net.StateMachine.Extensions
 
         public static Task DeleteDisposableItems(this StateMachineScope scope, string collectionName = "Messages")
         {
-            return scope.DeleteItem(collectionName);
+            return scope.DeleteItemAsync(collectionName);
         }
 
         public static IFlow<TSource> DisposeItems<TSource, TItemId>(this IFlow<TSource> source, Func<IEnumerable<TItemId>, StateMachineScope, Task> disposeItems, string collectionName = "Messages")

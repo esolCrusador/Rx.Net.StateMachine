@@ -43,7 +43,7 @@ namespace Rx.Net.StateMachine
         public StateMachineScope EndScope(string prefix) =>
             new StateMachineScope(StateMachine, SessionState, SessionStateStorage, CancellationToken, RemovePrefix(prefix));
 
-        public async Task<StateMachineScope> BeginRecursiveScope(string prefix)
+        public async Task<StateMachineScope> BeginRecursiveScopeAsync(string prefix)
         {
             string depthName = GetDepthName(AddPrefix(prefix));
             if (!SessionState.TryGetItem(depthName, StateMachine.SerializerOptions, out int depth))
@@ -57,7 +57,7 @@ namespace Rx.Net.StateMachine
             return new StateMachineScope(StateMachine, SessionState, SessionStateStorage, CancellationToken, AddPrefix(prefix));
         }
 
-        public async Task<StateMachineScope> IncreaseRecursionDepth()
+        public async Task<StateMachineScope> IncreaseRecursionDepthAsync()
         {
             var depthName = GetDepthName(StatePrefix);
             int depth = GetRecoursionDepth() ?? throw new ItemNotFoundException(depthName);
@@ -72,63 +72,63 @@ namespace Rx.Net.StateMachine
         public IEnumerable<TEvent> GetEvents<TEvent>(IEventAwaiter<TEvent> eventAwaiter, Func<TEvent, bool>? matches) =>
             SessionState.GetEvents(eventAwaiter, matches);
 
-        public Task AddStep<TState>(string stateId, TState stepState)
+        public Task AddStepAsync<TState>(string stateId, TState stepState)
         {
             SessionState.AddStep(AddPrefix(stateId), stepState, StateMachine.SerializerOptions);
 
             return SessionStateStorage.PersistStepState(SessionState);
         }
 
-        public Task AddItem<TItem>(string itemId, TItem item)
+        public Task AddItemAsync<TItem>(string itemId, TItem item)
         {
             SessionState.AddItem(AddPrefix(itemId), item, StateMachine.SerializerOptions);
 
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
-        public Task AddOrUpdateItem<TItem>(string itemId, Func<TItem> getItemToAdd, Func<TItem, TItem> updateItem)
+        public Task AddOrUpdateItemAsync<TItem>(string itemId, Func<TItem> getItemToAdd, Func<TItem, TItem> updateItem)
         {
             SessionState.AddOrUpdateItem(AddPrefix(itemId), getItemToAdd, updateItem, StateMachine.SerializerOptions);
 
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
-        public Task AddOrUpdateItem<TItem>(string itemId, TItem item)
+        public Task AddOrUpdateItemAsync<TItem>(string itemId, TItem item)
         {
             SessionState.AddOrUpdateItem(AddPrefix(itemId), item);
 
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
-        public Task AddOrUpdateGlobalItem<TItem>(string itemId, Func<TItem> getItemToAdd, Func<TItem, TItem> updateItem)
+        public Task AddOrUpdateGlobalItemAsync<TItem>(string itemId, Func<TItem> getItemToAdd, Func<TItem, TItem> updateItem)
         {
             SessionState.AddOrUpdateItem($"Global.{itemId}", getItemToAdd, updateItem, StateMachine.SerializerOptions);
 
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
-        public Task UpdateGlobalItem<TItem>(string itemId, Func<TItem?, TItem> updateItem)
+        public Task UpdateGlobalItemAsync<TItem>(string itemId, Func<TItem?, TItem> updateItem)
         {
             SessionState.UpdateItem($"Global.{itemId}", updateItem, StateMachine.SerializerOptions);
 
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
-        public Task AddOrUpdateGlobalItem<TItem>(string itemId, Func<TItem> getItemToAdd, Action<TItem> updateItem)
+        public Task AddOrUpdateGlobalItemAsync<TItem>(string itemId, Func<TItem> getItemToAdd, Action<TItem> updateItem)
         {
             SessionState.AddOrUpdateItem($"Global.{itemId}", getItemToAdd, updateItem, StateMachine.SerializerOptions);
 
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
-        public Task AddGlobalItem<TItem>(string itemId, TItem item)
+        public Task AddGlobalItemAsync<TItem>(string itemId, TItem item)
         {
             SessionState.AddItem($"Global.{itemId}", item, StateMachine.SerializerOptions);
 
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
-        public Task AddOrUpdateGlobalItem<TItem>(string itemId, TItem item)
+        public Task AddOrUpdateGlobalItemAsync<TItem>(string itemId, TItem item)
         {
             SessionState.UpdateItem($"Global.{itemId}", item, StateMachine.SerializerOptions);
 
@@ -168,11 +168,16 @@ namespace Rx.Net.StateMachine
             return SessionState.TryGetItem($"Global.{itemId}", StateMachine.SerializerOptions, out item);
         }
 
-        public Task UpdateItem<TItem>(string itemId, TItem item)
+        public Task UpdateItemAsync<TItem>(string itemId, TItem item)
         {
-            SessionState.UpdateItem(AddPrefix(itemId), item, StateMachine.SerializerOptions);
+            UpdateItem(itemId, item);
 
             return SessionStateStorage.PersistItemState(SessionState);
+        }
+
+        public void UpdateItem<TItem>(string itemId, TItem item)
+        {
+            SessionState.UpdateItem(AddPrefix(itemId), item, StateMachine.SerializerOptions);
         }
 
         public TItem GetItem<TItem>(string itemId)
@@ -180,7 +185,7 @@ namespace Rx.Net.StateMachine
             return SessionState.GetItem<TItem>(AddPrefix(itemId), StateMachine.SerializerOptions);
         }
 
-        public bool TryGetItem<TItem>(string itemId, [MaybeNullWhen(false)] out TItem? item)
+        public bool TryGetItem<TItem>(string itemId, [MaybeNullWhen(false)] out TItem item)
         {
             return SessionState.TryGetItem<TItem>(AddPrefix(itemId), StateMachine.SerializerOptions, out item);
         }
@@ -210,21 +215,21 @@ namespace Rx.Net.StateMachine
                     ?? throw new InvalidOperationException($"Could not get items {itemId} for recoursing depth {recoursionDepth + 1}");
         }
 
-        public Task DeleteItem(string itemId)
+        public Task DeleteItemAsync(string itemId)
         {
             SessionState.DeleteItem(itemId);
 
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
-        public Task AddEvent(object @event, IEnumerable<IEventAwaiter> eventAwaiters)
+        public Task AddEventAsync(object @event, IEnumerable<IEventAwaiter> eventAwaiters)
         {
             SessionState.AddEvent(@event, eventAwaiters);
 
             return SessionStateStorage.PersistEventState(SessionState);
         }
 
-        public Task EventHandled<TEvent>(TEvent e)
+        public Task EventHandledAsync<TEvent>(TEvent e)
             where TEvent : class
         {
             SessionState.MarkEventAsHandled(e, StateMachine.SerializerOptions);
@@ -232,21 +237,21 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistEventState(SessionState);
         }
 
-        public Task AddEventAwaiter<TEvent>(string stateId, IEventAwaiter<TEvent> eventAwaiter)
+        public Task AddEventAwaiterAsync<TEvent>(string stateId, IEventAwaiter<TEvent> eventAwaiter)
         {
             SessionState.AddEventAwaiter<TEvent>(AddPrefix(stateId), eventAwaiter);
 
             return SessionStateStorage.PersistEventAwaiter(SessionState);
         }
 
-        public Task MakeDefault(bool isDefault)
+        public Task MakeDefaultAsync(bool isDefault)
         {
             SessionState.MakeDefault(isDefault);
 
             return SessionStateStorage.PersistIsDefault(SessionState);
         }
 
-        public Task RemoveScopeAwaiters()
+        public Task RemoveScopeAwaitersAsync()
         {
             SessionState.RemoveEventAwaiters(StatePrefix ?? throw new InvalidOperationException("StatePrefix is null"));
 

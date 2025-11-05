@@ -18,7 +18,7 @@ namespace Rx.Net.StateMachine.Flow
 
             return flow.SelectAsync(async s =>
             {
-                await flow.Scope.AddStep(stateId, s);
+                await flow.Scope.AddStepAsync(stateId, s);
 
                 return s;
             });
@@ -31,7 +31,7 @@ namespace Rx.Net.StateMachine.Flow
 
             return flow.SelectAsync(async s =>
             {
-                await flow.Scope.AddStep(stateId, s);
+                await flow.Scope.AddStepAsync(stateId, s);
 
                 return s;
             });
@@ -70,7 +70,7 @@ namespace Rx.Net.StateMachine.Flow
             }).Concat().Take(1)
                 .Select(async r =>
                 {
-                    await whenAnyScope.RemoveScopeAwaiters();
+                    await whenAnyScope.RemoveScopeAwaitersAsync();
                     return r;
                 }).Concat()
             );
@@ -82,7 +82,7 @@ namespace Rx.Net.StateMachine.Flow
             return new StateMachineFlow<TResult>(scope, Observable.Merge(factories.Select(f => f(whenAnyScope)).Where(flow => flow != null).Select(flow => flow!.Observable)).Take(1)
                 .Select(async result =>
                 {
-                    await whenAnyScope.RemoveScopeAwaiters();
+                    await whenAnyScope.RemoveScopeAwaitersAsync();
                     return result;
                 }).Concat()
             );
@@ -141,7 +141,7 @@ namespace Rx.Net.StateMachine.Flow
         {
             return source.SelectAsync(async (s, scope) =>
             {
-                await scope.IncreaseRecursionDepth();
+                await scope.IncreaseRecursionDepthAsync();
                 return s;
             });
         }
@@ -165,7 +165,7 @@ namespace Rx.Net.StateMachine.Flow
             {
                 return new StateMachineFlow<TEvent>(scope, notHandledEvents.ToObservable().Select(async e =>
                 {
-                    await scope.EventHandled(e);
+                    await scope.EventHandledAsync(e);
 
                     return e;
                 }).Concat());
@@ -173,7 +173,7 @@ namespace Rx.Net.StateMachine.Flow
 
             return new StateMachineFlow<TEvent>(scope, Observable.Create<TEvent>(async observer =>
             {
-                await scope.AddEventAwaiter<TEvent>(stateId, eventAwaiter);
+                await scope.AddEventAwaiterAsync<TEvent>(stateId, eventAwaiter);
                 observer.OnCompleted();
             }));
         }
