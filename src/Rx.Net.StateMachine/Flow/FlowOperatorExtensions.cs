@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace Rx.Net.StateMachine.Flow
@@ -147,9 +148,9 @@ namespace Rx.Net.StateMachine.Flow
             }));
         }
 
-        public delegate Task FinallyDelegate<TSource>(bool isExecuted, TSource? source, Exception? ex, StateMachineScope scope);
+        public delegate Task FinallyAsyncDelegate<TSource>(bool isExecuted, TSource? source, Exception? ex, StateMachineScope scope);
 
-        public static IFlow<TSource> FinallyAsync<TSource>(this IFlow<TSource> flow, FinallyDelegate<TSource> handle)
+        public static IFlow<TSource> FinallyAsync<TSource>(this IFlow<TSource> flow, FinallyAsyncDelegate<TSource> handle)
         {
             return new StateMachineFlow<TSource>(flow.Scope, Observable.Create<TSource>(observer =>
             {
@@ -165,12 +166,79 @@ namespace Rx.Net.StateMachine.Flow
                     },
                     ex =>
                     {
-                        handle(true, lastSource, ex, flow.Scope).ContinueWith(_ => observer.OnError(ex));
+                        handle(true, lastSource, ex, flow.Scope).ContinueWith(result =>
+                        {
+                            if (result.IsFaulted)
+                                ex = new AggregateException("Failed twice", ex, result.Exception!);
+
+                            observer.OnError(ex);
+                        });
                         isFinalized = true;
                     },
                     () =>
                     {
-                        handle(isExecuted, lastSource, null, flow.Scope).ContinueWith(_ => observer.OnCompleted());
+                        handle(isExecuted, lastSource, null, flow.Scope).ContinueWith(result =>
+                        {
+                            if (result.IsFaulted)
+                                observer.OnError(result.Exception);
+                            else
+                                observer.OnCompleted();
+                        });
+                        isFinalized = true;
+                    });
+
+                return () =>
+                {
+                    if (!isFinalized)
+                        handle(isExecuted, lastSource, null, flow.Scope);
+                    subscrption.Dispose();
+                };
+            }));
+        }
+
+        public delegate void FinallyDelegate<TSource>(bool isExecuted, TSource? source, Exception? ex, StateMachineScope scope);
+        public static IFlow<TSource> Finally<TSource>(this IFlow<TSource> flow, FinallyDelegate<TSource> handle)
+        {
+            return new StateMachineFlow<TSource>(flow.Scope, Observable.Create<TSource>(observer =>
+            {
+                bool isExecuted = false;
+                bool isFinalized = false;
+                TSource? lastSource = default;
+                var subscrption = flow.Observable.Subscribe(
+                    source =>
+                    {
+                        lastSource = source;
+                        isExecuted = true;
+                        observer.OnNext(source);
+                    },
+                    ex =>
+                    {
+                        try
+                        {
+                            handle(true, lastSource, ex, flow.Scope);
+                        }
+                        catch (Exception e)
+                        {
+                            ex = new AggregateException("Failed twice", ex, e);
+                        }
+                        finally
+                        {
+                            observer.OnError(ex);
+                        }
+
+                        isFinalized = true;
+                    },
+                    () =>
+                    {
+                        try
+                        {
+                            handle(isExecuted, lastSource, null, flow.Scope);
+                            observer.OnCompleted();
+                        }
+                        catch (Exception ex)
+                        {
+                            observer.OnError(ex);
+                        }
                         isFinalized = true;
                     });
 

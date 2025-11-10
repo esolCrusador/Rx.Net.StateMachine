@@ -60,5 +60,18 @@ namespace Rx.Net.StateMachine.Extensions
                 await disposeItems(allMessages.SelectMany(messages => messages), scope);
             });
         }
+
+        public static IFlow<TSource> DisposeItems<TSource, TItemId>(this IFlow<TSource> source, Action<IEnumerable<TItemId>, StateMachineScope> disposeItems, string collectionName = "Messages")
+        {
+            return source.Finally((isExecuted, s, ex, scope) =>
+            {
+                if (!isExecuted)
+                    return;
+
+                var allMessages = source.Scope.GetItems<List<TItemId>>(collectionName);
+
+                disposeItems(allMessages.SelectMany(messages => messages), scope);
+            });
+        }
     }
 }
