@@ -139,6 +139,11 @@ namespace Rx.Net.StateMachine.Flow
             }));
         }
 
+        public static IFlow<TElement> Tap<TElement>(this IFlow<TElement> flow, Action execute)
+        {
+            return Tap(flow, _ => execute());
+        }
+
         public static IFlow<TElement> Tap<TElement>(this IFlow<TElement> flow, Action<TElement, StateMachineScope> execute)
         {
             return new StateMachineFlow<TElement>(flow.Scope, flow.Observable.Select(e =>

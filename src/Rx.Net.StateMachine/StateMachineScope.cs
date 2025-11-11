@@ -86,11 +86,21 @@ namespace Rx.Net.StateMachine
             return SessionStateStorage.PersistItemState(SessionState);
         }
 
+        public void AddOrUpdateItem<TItem>(string itemId, Func<TItem> getItemToAdd, Func<TItem, TItem> updateItem)
+        {
+            SessionState.AddOrUpdateItem(AddPrefix(itemId), getItemToAdd, updateItem, StateMachine.SerializerOptions);
+        }
+
         public Task AddOrUpdateItemAsync<TItem>(string itemId, Func<TItem> getItemToAdd, Func<TItem, TItem> updateItem)
         {
             SessionState.AddOrUpdateItem(AddPrefix(itemId), getItemToAdd, updateItem, StateMachine.SerializerOptions);
 
             return SessionStateStorage.PersistItemState(SessionState);
+        }
+
+        public void AddOrUpdateItem<TItem>(string itemId, TItem item)
+        {
+            SessionState.AddOrUpdateItem(AddPrefix(itemId), item);
         }
 
         public Task AddOrUpdateItemAsync<TItem>(string itemId, TItem item)
