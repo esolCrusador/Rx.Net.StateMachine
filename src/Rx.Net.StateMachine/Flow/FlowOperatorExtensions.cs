@@ -171,6 +171,7 @@ namespace Rx.Net.StateMachine.Flow
                     },
                     ex =>
                     {
+                        isFinalized = true;
                         handle(true, lastSource, ex, flow.Scope).ContinueWith(result =>
                         {
                             if (result.IsFaulted)
@@ -178,10 +179,10 @@ namespace Rx.Net.StateMachine.Flow
 
                             observer.OnError(ex);
                         });
-                        isFinalized = true;
                     },
                     () =>
                     {
+                        isFinalized = true;
                         handle(isExecuted, lastSource, null, flow.Scope).ContinueWith(result =>
                         {
                             if (result.IsFaulted)
@@ -189,7 +190,6 @@ namespace Rx.Net.StateMachine.Flow
                             else
                                 observer.OnCompleted();
                         });
-                        isFinalized = true;
                     });
 
                 return () =>
@@ -218,6 +218,7 @@ namespace Rx.Net.StateMachine.Flow
                     },
                     ex =>
                     {
+                        isFinalized = true;
                         try
                         {
                             handle(true, lastSource, ex, flow.Scope);
@@ -230,11 +231,10 @@ namespace Rx.Net.StateMachine.Flow
                         {
                             observer.OnError(ex);
                         }
-
-                        isFinalized = true;
                     },
                     () =>
                     {
+                        isFinalized = true;
                         try
                         {
                             handle(isExecuted, lastSource, null, flow.Scope);
@@ -244,7 +244,6 @@ namespace Rx.Net.StateMachine.Flow
                         {
                             observer.OnError(ex);
                         }
-                        isFinalized = true;
                     });
 
                 return () =>
@@ -270,6 +269,8 @@ namespace Rx.Net.StateMachine.Flow
         {
             return source.Select(s => result);
         }
+
+        public static IFlow<TResult?> AsNullable<TResult>(this IFlow<TResult> source) where TResult : class => (IFlow<TResult?>)source;
 
         public static IFlow<TElement> TapException<TElement>(this IFlow<TElement> source, Action<Exception> tap) =>
             TapException(source, (ex, scope) => tap(ex));
