@@ -5,13 +5,24 @@ namespace Rx.Net.StateMachine.Persistance.Extensions
 {
     public static class TaskExtensions
     {
-        public static Task<ResultOrException<TResult>> ResultOrException<TResult>(this Task<TResult> task)
+        public static async Task<ResultOrException<TResult>> ResultOrException<TResult>(this Task<TResult> task)
         {
-            return task.ContinueWith(r => new Extensions.ResultOrException<TResult>
+            try
             {
-                Result = r.Result,
-                Exception = r.Exception
-            });
+                return new ResultOrException<TResult>
+                {
+                    Exception = null,
+                    Result = await task
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ResultOrException<TResult>
+                {
+                    Exception = ex,
+                    Result = default
+                };
+            }
         }
     }
 
