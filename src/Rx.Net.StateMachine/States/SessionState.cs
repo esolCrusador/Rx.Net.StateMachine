@@ -149,7 +149,7 @@ namespace Rx.Net.StateMachine.States
         internal void AddOrUpdateItem<TItem>(string itemId, TItem item) =>
             _items[itemId] = item;
 
-        internal bool TryGetItem<TItem>(string itemId, JsonSerializerOptions options, [MaybeNullWhen(false)] out TItem? item)
+        internal bool TryGetItem<TItem>(string itemId, JsonSerializerOptions options, [MaybeNullWhen(false)] out TItem item)
         {
             if (!_items.TryGetValue(itemId, out object? itemValue))
             {
@@ -157,7 +157,8 @@ namespace Rx.Net.StateMachine.States
                 return false;
             }
 
-            item = itemValue.DeserializeValue<TItem>(options, null);
+            item = itemValue.DeserializeValue<TItem>(options, null)
+                ?? throw new InvalidOperationException($"Item {itemId} is null");
             return true;
         }
 

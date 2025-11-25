@@ -68,7 +68,7 @@ namespace Rx.Net.StateMachine.Extensions
                 if (!isExecuted)
                     return;
 
-                var allMessages = source.Scope.GetItems<List<TItemId>>(collectionName);
+                var allMessages = source.Scope.TryGetItems<List<TItemId>>(collectionName);
 
                 disposeItems(allMessages.SelectMany(messages => messages), scope);
             });

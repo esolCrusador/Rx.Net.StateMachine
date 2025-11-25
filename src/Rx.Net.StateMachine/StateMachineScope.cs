@@ -225,6 +225,25 @@ namespace Rx.Net.StateMachine
                     ?? throw new InvalidOperationException($"Could not get items {itemId} for recoursing depth {recoursionDepth + 1}");
         }
 
+        /// <summary>
+        /// Gets multiple items if scope is recoursive if not gets single item
+        /// </summary>
+        public IEnumerable<TItem> TryGetItems<TItem>(string itemId)
+        {
+            var recoursionDepth = GetRecoursionDepth();
+            if (recoursionDepth == null)
+            {
+                if (TryGetItem<TItem>(itemId, out var item))
+                    yield return item;
+            }
+
+            while (recoursionDepth > 0)
+            {
+                if (SessionState.TryGetItem<TItem>(AddPrefix(StatePrefix, recoursionDepth--, itemId), StateMachine.SerializerOptions, out var item))
+                    yield return item;
+            }
+        }
+
         public Task DeleteItemAsync(string itemId)
         {
             SessionState.DeleteItem(itemId);

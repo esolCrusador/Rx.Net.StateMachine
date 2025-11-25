@@ -23,6 +23,10 @@ namespace Rx.Net.StateMachine.Extensions
                 {
                     return default; // TODO Delete after 01.03.2025
                 }
+                catch (NotSupportedException) when (typeof(TValue) == typeof(string) && jsonElement.Deserialize<Unit>() == Unit.Default)
+                {
+                    return default; // TODO Delete after 01.03.2026
+                }
                 catch (JsonException) when (deserializeOldValue != null)
                 {
                     return deserializeOldValue(jsonElement, options);
