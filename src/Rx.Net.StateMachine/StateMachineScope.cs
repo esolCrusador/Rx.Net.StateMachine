@@ -173,7 +173,7 @@ namespace Rx.Net.StateMachine
         public bool TryGetVariable(string variableName, [MaybeNullWhen(false)] out string? result) =>
             SessionState.TryGetItem<string?>(GetVariableItemName(variableName), StateMachine.SerializerOptions, out result);
 
-        public bool TryGetGlobalItem<TItem>(string itemId, [MaybeNullWhen(false)] out TItem? item)
+        public bool TryGetGlobalItem<TItem>(string itemId, [MaybeNullWhen(false)] out TItem item)
         {
             return SessionState.TryGetItem($"Global.{itemId}", StateMachine.SerializerOptions, out item);
         }
