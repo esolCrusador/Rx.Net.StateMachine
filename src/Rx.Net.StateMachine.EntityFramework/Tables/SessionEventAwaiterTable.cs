@@ -17,6 +17,7 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.Tables
         [StringLength(256), Column(TypeName = "varchar(256)")] public string? IgnoreIdentifier { get; set; }
         public int SequenceNumber { get; set; }
         public bool IsActive { get; set; } = true;
+        public DateTimeOffset CreatedAt { get; set; }
         public TContextKey ContextId { get; set; }
         public TContext Context { get; set; }
         [ForeignKey(nameof(SessionStateId)), DeleteBehavior(DeleteBehavior.NoAction)]

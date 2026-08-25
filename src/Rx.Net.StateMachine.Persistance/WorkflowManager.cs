@@ -302,10 +302,13 @@ namespace Rx.Net.StateMachine.Persistance
             }, cancellationToken);
         }
 
-        public Task<IReadOnlyList<HandlingResult>> HandleEvents(IReadOnlyCollection<object> events, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<HandlingResult>> HandleEvents(IReadOnlyList<object> events, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
         {
             if (events.Count == 0)
                 throw new ArgumentException("Empty events", nameof(events));
+
+            if (events.Count == 1)
+                return HandleEvent(events[0], beforePersist, cancellationToken);
 
             return _concurrencyRetry.ExecuteAsync(async cancellation =>
             {
@@ -483,6 +486,7 @@ namespace Rx.Net.StateMachine.Persistance
 
         private static void UpdateSessionStateEntity(SessionState state, SessionStateEntity dest)
         {
+            var timestamp = DateTimeOffset.UtcNow;
             dest.WorkflowId = state.WorkflowId;
             dest.IsDefault = state.IsDefault;
             dest.Steps = state.Steps.Select(kvp =>
@@ -505,7 +509,8 @@ namespace Rx.Net.StateMachine.Persistance
                 Name = aw.Name,
                 Identifier = aw.Identifier,
                 IgnoreIdentifier = aw.IgnoreIdentifier,
-                SequenceNumber = aw.SequenceNumber
+                SequenceNumber = aw.SequenceNumber,
+                CreatedAt = timestamp
             }).ToList();
             dest.Counter = state.Counter;
             dest.Status = state.Status;

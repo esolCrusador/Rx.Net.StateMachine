@@ -12,6 +12,7 @@ using Rx.Net.StateMachine.Persistance.Entities;
 using Rx.Net.StateMachine.Persistance.Exceptions;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text.Json;
@@ -92,7 +93,8 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
         {
             var awaitHandler = EventAwaiterResolver.GetAwaiterHandler(@event.GetType());
 
-            var filter = GetAwaitersFilter(awaitHandler, @event);
+            var awaiters = GetAwaiters(awaitHandler, @event);
+            var filter = GetAwaitersFilter(awaiters);
             var sessionId = GetSessionId(awaitHandler, @event);
             if (sessionId.HasValue)
                 filter = ExpressionExtensions.AggregateExpression(
@@ -100,12 +102,14 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                     s => s.SessionStateId == sessionId.Value,
                     filter
                 );
-
-            var sessions = await SessionStateDbContext.Set<SessionStateTable<TContext, TContextKey>>()
+            var sessionsQuery = SessionStateDbContext.Set<SessionStateTable<TContext, TContextKey>>()
                 .Include(ss => ss.Context)
                 .Include(ss => ss.Awaiters)
                 .Where(filter)
-                .Where(awaitHandler.GetSessionStateFilter(@event))
+                .Where(awaitHandler.GetSessionStateFilter(@event));
+            sessionsQuery = ApplyAwaiterSessionFilter(awaiters, sessionsQuery);
+
+            var sessions = await sessionsQuery
                 .AsNoTracking()
                 .ToListAsync(cancellationToken);
 
@@ -114,8 +118,31 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
 
             return GetMemenots(sessions).ToList();
         }
+        private IQueryable<SessionStateTable<TContext, TContextKey>> ApplyAwaiterSessionFilter(IReadOnlyList<IEventAwaiter> awaiters, IQueryable<SessionStateTable<TContext, TContextKey>> sessionsQuery)
+        {
+            bool hasLatestSessionAwaiter = false;
+            for (int i = 0; i < awaiters.Count; i++)
+                if (awaiters[i] is ISessionsFilterAwaiter)
+                    hasLatestSessionAwaiter = true;
 
-        public async Task<IReadOnlyCollection<ISessionStateMemento>> GetSessionStates(IEnumerable<object> events, CancellationToken cancellationToken)
+            if (!hasLatestSessionAwaiter)
+                return sessionsQuery;
+
+            if (awaiters.Count > 1)
+                throw new ArgumentException($"{nameof(ISessionsFilterAwaiter)} must be exclusive");
+
+            var awaiter = awaiters[0];
+            return ((ISessionsFilterAwaiter)awaiter).FilterAwaiterType switch
+            {
+                SessionFilterAwaiterType.None => sessionsQuery,
+                SessionFilterAwaiterType.LatestAwaiter => sessionsQuery
+                        .OrderByDescending(s => s.Awaiters.FirstOrDefault(aw => aw.IsActive && aw.Identifier == awaiter.AwaiterId)!.CreatedAt)
+                        .Take(1),
+                _ => throw new NotSupportedException($"Not supported {nameof(SessionFilterAwaiterType)}.{((ISessionsFilterAwaiter)awaiter).FilterAwaiterType}")
+            };
+        }
+
+        public async Task<IReadOnlyCollection<ISessionStateMemento>> GetSessionStates(IReadOnlyCollection<object> events, CancellationToken cancellationToken)
         {
             var awaitHandlers = events.Select(ev => new KeyValuePair<object, IAwaiterHandler<TContext, TContextKey>>(
                 ev,
@@ -128,7 +155,12 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
                 var awaitHandler = kvp.Value;
                 var ev = kvp.Key;
 
-                var filter = GetAwaitersFilter(awaitHandler, ev);
+                var awaiters = GetAwaiters(awaitHandler, ev);
+                foreach (var awaiter in awaiters)
+                    if (awaiter is ISessionsFilterAwaiter)
+                        throw new NotSupportedException($"Multi events handling for {nameof(ISessionsFilterAwaiter)} not supported ");
+
+                var filter = GetAwaitersFilter(awaiters);
                 var sessionId = awaitHandler.GetStaleSessionVersion(ev)?.SessionId;
                 if (sessionId.HasValue)
                 {
@@ -188,20 +220,15 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             return CreateMemento(session);
         }
 
-        private Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> GetAwaitersFilter(IAwaiterHandler<TContext, TContextKey> awaiterHandler, object @event)
+        private Expression<Func<SessionStateTable<TContext, TContextKey>, bool>> GetAwaitersFilter(IReadOnlyList<IEventAwaiter> awaiters)
         {
             bool hasIgnoreAwaiter = false;
-            List<IEventAwaiter> awaiters = new List<IEventAwaiter>();
-            foreach (var at in awaiterHandler.GetAwaiterIdTypes())
-            {
-                var awaiter = AwaiterExtensions.CreateAwaiter(at, @event);
-                awaiters.Add(awaiter);
+            foreach (var awaiter in awaiters)
                 hasIgnoreAwaiter = hasIgnoreAwaiter || awaiter is IEventAwaiterIgnore;
-            }
 
-            Expression<Func<SessionEventAwaiterTable<TContext, TContextKey>, bool>> filter;
             if (hasIgnoreAwaiter)
             {
+                Expression<Func<SessionEventAwaiterTable<TContext, TContextKey>, bool>> filter;
                 filter = awaiters.Select(awaiter =>
                 {
                     Expression<Func<SessionEventAwaiterTable<TContext, TContextKey>, bool>> awf;
@@ -221,10 +248,20 @@ namespace Rx.Net.StateMachine.EntityFramework.Tests.UnitOfWork
             else
             {
                 var awaiterIdentifiers = awaiters.Select(aw => aw.AwaiterId).ToList();
-                filter = aw => aw.IsActive && awaiterIdentifiers.Contains(aw.Identifier);
 
                 return ss => ss.Awaiters.Any(aw => aw.IsActive && awaiterIdentifiers.Contains(aw.Identifier));
             }
+        }
+
+        private IReadOnlyList<IEventAwaiter> GetAwaiters(IAwaiterHandler<TContext, TContextKey> awaiterHandler, object @event)
+        {
+            List<IEventAwaiter> awaiters = new List<IEventAwaiter>();
+            foreach (var at in awaiterHandler.GetAwaiterIdTypes())
+            {
+                var awaiter = AwaiterExtensions.CreateAwaiter(at, @event);
+                awaiters.Add(awaiter);
+            }
+            return awaiters;
         }
 
         private Guid? GetSessionId(IAwaiterHandler<TContext, TContextKey> awaiterHandler, object @event) =>
