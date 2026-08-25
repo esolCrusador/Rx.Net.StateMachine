@@ -9,5 +9,6 @@ namespace Rx.Net.StateMachine.Persistance.Entities
         public required string Identifier { get; set; }
         public required string? IgnoreIdentifier { get; set; }
         public int SequenceNumber { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
     }
 }

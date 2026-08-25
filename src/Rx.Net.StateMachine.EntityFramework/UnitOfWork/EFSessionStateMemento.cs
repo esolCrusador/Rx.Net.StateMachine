@@ -102,7 +102,8 @@ namespace Rx.Net.StateMachine.EntityFramework.UnitOfWork
                         Identifier = aw.Identifier,
                         IgnoreIdentifier = aw.IgnoreIdentifier,
                         ContextId = dest.ContextId,
-                        IsActive = dest.Status == SessionStateStatus.InProgress
+                        IsActive = dest.Status == SessionStateStatus.InProgress,
+                        CreatedAt = aw.CreatedAt
                     };
                     dbContext.Add(awaiter);
                     dest.Awaiters.Add(awaiter);
