@@ -10,8 +10,11 @@ using Rx.Net.StateMachine.States;
 using Rx.Net.StateMachine.Storage;
 using Rx.Net.StateMachine.WorkflowFactories;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -280,7 +283,7 @@ namespace Rx.Net.StateMachine.Persistance
         }
 
         public Task<IReadOnlyList<HandlingResult>> HandleEvent<TEvent>(TEvent @event, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
-        where TEvent : class
+            where TEvent : class
         {
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
@@ -300,6 +303,31 @@ namespace Rx.Net.StateMachine.Persistance
                     return new List<HandlingResult>();
                 return await HandleSessionStates(sessionStates, (sessionState, ccl) => HandleSessionStateEvent(@event, sessionState, beforePersist, ccl), cancellation);
             }, cancellationToken);
+        }
+
+        private static readonly ConcurrentDictionary<Type, Func<WorkflowManager<TContext>, object, BeforePersistScope?, CancellationToken, Task<IReadOnlyList<HandlingResult>>>> EventTypeDelegates = new();
+        private static MethodInfo HandleEventMethod = typeof(WorkflowManager<TContext>).GetMethods()
+            .Where(m => m.Name == "HandleEvent" && m.IsGenericMethod)
+            .Single();
+        public Task<IReadOnlyList<HandlingResult>> HandleEvent(object @event, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
+        {
+            return EventTypeDelegates.GetOrAdd(@event.GetType(), eventType =>
+            {
+                var handleEvent = HandleEvent;
+                var instanceParameter = Expression.Parameter(typeof(WorkflowManager<TContext>), "workflowManager");
+                var eventParameter = Expression.Parameter(typeof(object), "event");
+                var beforePersistParameter = Expression.Parameter(typeof(BeforePersistScope), "beforePersist");
+                var cancellationTokenParameter = Expression.Parameter(typeof(CancellationToken), "cancellationToken");
+
+                return Expression.Lambda<Func<WorkflowManager<TContext>, object, BeforePersistScope?, CancellationToken, Task<IReadOnlyList<HandlingResult>>>>(
+                    Expression.Call(instanceParameter, HandleEventMethod.MakeGenericMethod(eventType), 
+                        Expression.Convert(eventParameter, eventType),
+                        beforePersistParameter,
+                        cancellationTokenParameter
+                    ),
+                    instanceParameter, eventParameter, beforePersistParameter, cancellationTokenParameter
+                ).Compile();
+            })(this, @event, beforePersist, cancellationToken);
         }
 
         public Task<IReadOnlyList<HandlingResult>> HandleEvents(IReadOnlyList<object> events, BeforePersistScope? beforePersist, CancellationToken cancellationToken)
