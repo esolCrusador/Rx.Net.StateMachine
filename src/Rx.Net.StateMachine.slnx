@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Rx.Net.StateMachine.EntityFramework/Rx.Net.StateMachine.EntityFramework.csproj" />
+  <Project Path="Rx.Net.StateMachine.Persistance/Rx.Net.StateMachine.Persistance.csproj" />
+  <Project Path="Rx.Net.StateMachine.Tests/Rx.Net.StateMachine.Tests.csproj" />
+  <Project Path="Rx.Net.StateMachine/Rx.Net.StateMachine.csproj" />
+</Solution>
